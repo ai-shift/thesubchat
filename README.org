@@ -2,12 +2,22 @@
 #+author: aishift
 
 * Architecture
-   - Stack: Go + HTMX (preact.js) + Turso
+
+   - *Stack:*
+     - Go
+     - [[https://htmx.org/][HTMX]]
+     - [[https://turso.tech/][Turso]]
+   - *Used libraries:*
+     - [[https://github.com/a-h/templ][Templ]]
+     - [[https://github.com/golang-jwt/jwt][golang-jwt]]
+     - [[https://github.com/golang/oauth2][oauth2]]
+     - [[https://ace.c9.io/][ace.js]]
+     - [[https://addshore.com/2018/03/gitgraph-js-and-codepen-io-for-git-visualization/][gitgraph.js]]
+     - [[https://github.com/go-git/go-git][golang git]]
+     - [[https://ivis-at-bilkent.github.io/cytoscape.js-fcose/demo/demo-compound.html][cytoscape.js]]
 
 ** Services
 *** Auth
-- [[https://github.com/golang-jwt/jwt][golang-jwt]]
-- [[https://github.com/golang/oauth2][oauth2]] /optional/
 
 Use cases:
 
@@ -15,7 +25,6 @@ Use cases:
 2. Logout
 
 *** Chat
-- [[https://ace.c9.io/][ace.js]]
 
 Use cases:
 
@@ -38,9 +47,6 @@ Use cases:
 
 *** VCS
 
-- [[https://addshore.com/2018/03/gitgraph-js-and-codepen-io-for-git-visualization/][gitgraph.js]]
-- [[https://github.com/go-git/go-git][golang git]]
-
 Use cases:
 
 1. Checkout
@@ -50,7 +56,6 @@ Use cases:
 5. Connect chats
 
 *** Graph
-- [[https://ivis-at-bilkent.github.io/cytoscape.js-fcose/demo/demo-compound.html][cytoscape.js]]
 
 Use cases:
 
