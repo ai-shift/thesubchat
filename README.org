@@ -8,7 +8,6 @@
      - [[https://htmx.org/][HTMX]]
      - [[https://turso.tech/][Turso]]
    - *Used libraries:*
-     - [[https://github.com/a-h/templ][Templ]]
      - [[https://github.com/golang-jwt/jwt][golang-jwt]]
      - [[https://github.com/golang/oauth2][oauth2]]
      - [[https://ace.c9.io/][ace.js]]
