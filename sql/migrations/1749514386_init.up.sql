@@ -9,11 +9,13 @@ CREATE TABLE chat (
 );
 
 CREATE TABLE chat_mention (
-    src_chat_id INTEGER,
-    dest_chat_id INTEGER,
-    PRIMARY KEY (src_chat_id, dest_chat_id),
-    FOREIGN KEY (src_chat_id) REFERENCES chat (id),
-    FOREIGN KEY (dest_chat_id) REFERENCES chat (id)
+    from_chat_id INTEGER,
+    from_chat_commit TEXT,
+    to_chat_id INTEGER,
+    to_chat_commit TEXT,
+    PRIMARY KEY (from_chat_id, from_chat_commit, to_chat_id, to_chat_commit),
+    FOREIGN KEY (from_chat_id) REFERENCES chat (id),
+    FOREIGN KEY (to_chat_id) REFERENCES chat (id)
 );
 
 CREATE TABLE chat_tag (
