@@ -3,19 +3,20 @@ package chat
 import (
 	"context"
 	"encoding/json"
+	"github.com/google/uuid"
 	"shellshift/internal/chat/llm"
 	"shellshift/internal/db"
 )
 
 type Chat struct {
-	ID       int64
+	ID       uuid.UUID
 	Title    string
 	Messages []llm.Message
 }
 
-func findChat(q *db.Queries, id int64) (*Chat, error) {
+func findChat(q *db.Queries, id uuid.UUID) (*Chat, error) {
 	ctx := context.Background()
-	chat, err := q.FindChat(ctx, id)
+	chat, err := q.FindChat(ctx, id.String())
 	if err != nil {
 		return nil, err
 	}
@@ -26,7 +27,7 @@ func findChat(q *db.Queries, id int64) (*Chat, error) {
 	}
 	return &Chat{
 		ID:       id,
-		Title:    chat.Title,
+		Title:    chat.Title.String,
 		Messages: msgs,
 	}, nil
 }

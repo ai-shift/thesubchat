@@ -3,8 +3,10 @@
 --
 CREATE TABLE schema_migrations (id VARCHAR(255) NOT NULL PRIMARY KEY);
 
+CREATE TABLE sqlite_sequence(name, seq);
+
 CREATE TABLE chat (
-    id INTEGER PRIMARY KEY,
-    title TEXT NOT NULL,
+    id TEXT PRIMARY KEY,
+    title TEXT,
     messages BLOB NOT NULL
 );

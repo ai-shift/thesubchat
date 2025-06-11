@@ -4,6 +4,7 @@ go 1.24.3
 
 require (
 	github.com/firebase/genkit/go v0.5.4
+	github.com/google/uuid v1.6.0
 	github.com/tursodatabase/libsql-client-go v0.0.0-20240902231107-85af5b9d094d
 )
 
@@ -22,7 +23,6 @@ require (
 	github.com/google/dotprompt/go v0.0.0-20250424065700-61c578cf43ac // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect

@@ -3,13 +3,15 @@ package chat
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"fmt"
+	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 	"shellshift/internal/chat/llm"
 	"shellshift/internal/db"
 	"shellshift/internal/templates"
-	"strconv"
 )
 
 type ChatHandler struct {
@@ -29,6 +31,7 @@ func InitMux(q *db.Queries) *http.ServeMux {
 	}
 	m := http.NewServeMux()
 	m.HandleFunc("GET /{id}", h.getChat)
+	m.HandleFunc("GET /", h.getEmptyChat)
 	m.HandleFunc("POST /{id}/user/message", h.postUserMessage)
 	return m
 }
@@ -37,6 +40,8 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 	slog.Info("getting chat")
 	id, err := deserID(w, r)
 	if err != nil {
+		slog.Error("failed to parse chat id", "with", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	chat, err := findChat(h.q, id)
@@ -52,6 +57,14 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
+	err := h.templates.Render(w, "index", Chat{Title: "New chat", ID: uuid.New()})
+	if err != nil {
+		slog.Error("failed to render index page", "with", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	// Get chat
 	id, err := deserID(w, r)
@@ -59,21 +72,30 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	chat, err := findChat(h.q, id)
-	if err != nil {
+	switch err {
+	case nil:
+		break
+	case sql.ErrNoRows:
+		chat = &Chat{
+			ID:       id,
+			Messages: make([]llm.Message, 0),
+		}
+	default:
 		slog.Error("failed to find chat", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+
+	slog.Info("got chat", "chat", fmt.Sprintf("%#v", chat))
 	// Eval prompt
 	prompt := r.FormValue("prompt")
-	chat.Messages = append(chat.Messages, llm.Message{Text: prompt, Role: "user"})
-	chat.Messages, err = h.llm.Eval(chat.Messages)
+	chat.Messages, err = h.llm.Eval(append(chat.Messages, llm.Message{Text: prompt, Role: "user"}))
 	if err != nil {
 		slog.Error("failed to get eval prompt", "prompt", prompt, "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	slog.Info("user prompt", "prompt", prompt)
+
 	// Persist new messages
 	encoded, err := json.Marshal(chat.Messages)
 	if err != nil {
@@ -81,9 +103,9 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	err = h.q.SaveChat(h.ctx, db.SaveChatParams{
-		ID:       1,
-		Title:    chat.Title,
+
+	err = h.q.UpdateChat(h.ctx, db.UpdateChatParams{
+		ID:       id.String(),
 		Messages: encoded,
 	})
 	if err != nil {
@@ -99,12 +121,11 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func deserID(w http.ResponseWriter, r *http.Request) (int64, error) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+func deserID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, err error) {
+	id, err = uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		slog.Error("failed to parse chat id", "id", id)
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return 0, err
 	}
-	return id, nil
+	return
 }

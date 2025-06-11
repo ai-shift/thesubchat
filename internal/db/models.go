@@ -4,12 +4,21 @@
 
 package db
 
+import (
+	"database/sql"
+)
+
 type Chat struct {
-	ID       int64
-	Title    string
+	ID       string
+	Title    sql.NullString
 	Messages []byte
 }
 
 type SchemaMigration struct {
 	ID string
+}
+
+type SqliteSequence struct {
+	Name interface{}
+	Seq  interface{}
 }
