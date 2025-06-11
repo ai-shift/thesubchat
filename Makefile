@@ -31,3 +31,6 @@ install:
 
 run: lint
 	go run ./cmd/server/main.go
+
+run-air: lint
+	air --build.cmd "go build -o tmp/app cmd/server/main.go" --build.bin "./tmp/app"
