@@ -15,6 +15,6 @@ func (t *Templates) Render(w io.Writer, name string, data any) error {
 
 func New(glob string) *Templates {
 	return &Templates{
-		templates: template.Must(template.ParseGlob(glob)),
+		templates: template.Must(template.Must(template.ParseGlob("static/*.html")).ParseGlob(glob)),
 	}
 }
