@@ -66,11 +66,19 @@ func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
-	// Get chat
-	id, err := deserID(w, r)
-	if err != nil {
+	// Validate request
+	prompt := r.FormValue("prompt")
+	if prompt == "" {
+		http.Error(w, "Prompt shouldn't be empty", http.StatusBadRequest)
 		return
 	}
+	id, err := deserID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get chat
 	chat, err := findChat(h.q, id)
 	switch err {
 	case nil:
@@ -88,7 +96,6 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("got chat", "chat", fmt.Sprintf("%#v", chat))
 	// Eval prompt
-	prompt := r.FormValue("prompt")
 	chat.Messages, err = h.llm.Eval(append(chat.Messages, llm.Message{Text: prompt, Role: "user"}))
 	if err != nil {
 		slog.Error("failed to get eval prompt", "prompt", prompt, "err", err.Error())
