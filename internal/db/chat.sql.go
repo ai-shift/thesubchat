@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
 )
 
 const findChat = `-- name: FindChat :one
@@ -21,7 +20,7 @@ WHERE
 `
 
 type FindChatRow struct {
-	Title    sql.NullString
+	Title    string
 	Messages []byte
 }
 
@@ -36,35 +35,20 @@ const saveChat = `-- name: SaveChat :exec
 INSERT INTO
     chat (id, title, messages)
 VALUES
-    (?, ?, ?)
+    (?, ?, ?) ON conflict DO
+UPDATE
+SET
+    title = excluded.title,
+    messages = excluded.messages
 `
 
 type SaveChatParams struct {
 	ID       string
-	Title    sql.NullString
+	Title    string
 	Messages []byte
 }
 
 func (q *Queries) SaveChat(ctx context.Context, arg SaveChatParams) error {
 	_, err := q.db.ExecContext(ctx, saveChat, arg.ID, arg.Title, arg.Messages)
-	return err
-}
-
-const updateChat = `-- name: UpdateChat :exec
-UPDATE
-    chat
-SET
-    messages = ?
-WHERE
-    id = ?
-`
-
-type UpdateChatParams struct {
-	Messages []byte
-	ID       string
-}
-
-func (q *Queries) UpdateChat(ctx context.Context, arg UpdateChatParams) error {
-	_, err := q.db.ExecContext(ctx, updateChat, arg.Messages, arg.ID)
 	return err
 }

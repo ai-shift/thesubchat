@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS chat (
     id TEXT PRIMARY KEY,
-    title TEXT,
+    title TEXT NOT NULL,
     messages BLOB NOT NULL
 );

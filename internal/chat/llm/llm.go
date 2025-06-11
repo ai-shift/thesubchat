@@ -1,3 +1,4 @@
+// TODO: Seems like useless abstraction
 package llm
 
 import (

@@ -4,13 +4,9 @@
 
 package db
 
-import (
-	"database/sql"
-)
-
 type Chat struct {
 	ID       string
-	Title    sql.NullString
+	Title    string
 	Messages []byte
 }
 

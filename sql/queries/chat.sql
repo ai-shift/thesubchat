@@ -11,12 +11,8 @@ WHERE
 INSERT INTO
     chat (id, title, messages)
 VALUES
-    (?, ?, ?);
-
--- name: UpdateChat :exec
+    (?, ?, ?) ON conflict DO
 UPDATE
-    chat
 SET
-    messages = ?
-WHERE
-    id = ?;
+    title = excluded.title,
+    messages = excluded.messages;

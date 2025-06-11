@@ -7,6 +7,6 @@ CREATE TABLE sqlite_sequence(name, seq);
 
 CREATE TABLE chat (
     id TEXT PRIMARY KEY,
-    title TEXT,
+    title TEXT NOT NULL,
     messages BLOB NOT NULL
 );

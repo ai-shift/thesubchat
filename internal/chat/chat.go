@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
@@ -19,15 +21,24 @@ type ChatHandler struct {
 	templates *templates.Templates
 	llm       *llm.LLM
 	q         *db.Queries
+	g         *genkit.Genkit
 }
 
 func InitMux(q *db.Queries) *http.ServeMux {
 	ctx := context.Background()
+	g, err := genkit.Init(ctx,
+		genkit.WithPlugins(&googlegenai.GoogleAI{}),
+		genkit.WithDefaultModel("googleai/gemini-2.0-flash"),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("could not initialize Genkit: %v", err))
+	}
 	h := ChatHandler{
 		ctx:       ctx,
 		templates: templates.New("internal/chat/views/*.html"),
 		llm:       llm.New(ctx),
 		q:         q,
+		g:         g,
 	}
 	m := http.NewServeMux()
 	m.HandleFunc("GET /{id}", h.getChat)
@@ -77,17 +88,33 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Maybe title generation
+	errChan := make(chan error)
+	tChan := make(chan string)
+	var waitTitle bool
 
 	// Get chat
 	chat, err := findChat(h.q, id)
 	switch err {
 	case nil:
-		break
+		tChan <- chat.Title
 	case sql.ErrNoRows:
+		waitTitle = true
 		chat = &Chat{
 			ID:       id,
 			Messages: make([]llm.Message, 0),
 		}
+		go func() {
+			t, err := genTitle(ctx, h.g, prompt)
+			if err != nil {
+				errChan <- err
+			} else {
+				tChan <- t
+			}
+		}()
 	default:
 		slog.Error("failed to find chat", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -110,8 +137,23 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.q.UpdateChat(h.ctx, db.UpdateChatParams{
-		ID:       id.String(),
+	if waitTitle {
+    slog.Info("waiting for the title generation")
+		select {
+		case title := <-tChan:
+      slog.Info("title generated")
+			chat.Title = title
+		case err := <-errChan:
+			slog.Error("failed to generate title", "with", err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+  slog.Info("saving chat", "id", chat.ID)
+	err = h.q.SaveChat(h.ctx, db.SaveChatParams{
+		ID:       chat.ID.String(),
+		Title:    chat.Title,
 		Messages: encoded,
 	})
 	if err != nil {
@@ -119,6 +161,13 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+  // Redirect to the new page
+	if waitTitle {
+    w.Header().Set("HX-Redirect", fmt.Sprintf("%s", chat.ID))
+		return
+	}
+
 	// Render messages
 	err = h.templates.Render(w, "messages", chat.Messages)
 	if err != nil {
