@@ -10,7 +10,13 @@
   </head>
   <body>
     <h1>Hello, there!</h1>
-    <form hx-post="user/message">
+    <div id="messages">
+    </div>
+    <form
+      hx-post="user/message"
+      hx-target="#messages"
+      hx-on::after-request="if(event.detail.successful) this.reset()"
+    >
       <input id="prompt" name="prompt" type="text" placeholder="Prompt...">
       <button type="submit">Send</button>
     </form>
