@@ -9,6 +9,9 @@
     </head>
     <body>
       <h1>{{.Title}}</h1>
+      {{if .Messages}}
+	<a href="/chat">Start a new chat</a>
+      {{end}}
       <div id="messages">
 	{{template "messages" .Messages}}
       </div>
