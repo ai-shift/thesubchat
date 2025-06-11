@@ -48,7 +48,6 @@ func InitMux(q *db.Queries) *http.ServeMux {
 }
 
 func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
-	slog.Info("getting chat")
 	id, err := deserID(w, r)
 	if err != nil {
 		slog.Error("failed to parse chat id", "with", err)
@@ -138,10 +137,10 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if waitTitle {
-    slog.Info("waiting for the title generation")
+		slog.Info("waiting for the title generation")
 		select {
 		case title := <-tChan:
-      slog.Info("title generated")
+			slog.Info("title generated")
 			chat.Title = title
 		case err := <-errChan:
 			slog.Error("failed to generate title", "with", err.Error())
@@ -150,7 +149,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-  slog.Info("saving chat", "id", chat.ID)
+	slog.Info("saving chat", "id", chat.ID)
 	err = h.q.SaveChat(h.ctx, db.SaveChatParams{
 		ID:       chat.ID.String(),
 		Title:    chat.Title,
@@ -162,9 +161,10 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-  // Redirect to the new page
+	// Redirect to the new page
 	if waitTitle {
-    w.Header().Set("HX-Redirect", fmt.Sprintf("%s", chat.ID))
+		slog.Error("redirecting to the created chat")
+		w.Header().Set("HX-Redirect", chat.ID.String())
 		return
 	}
 
@@ -179,7 +179,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 func deserID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, err error) {
 	id, err = uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		slog.Error("failed to parse chat id", "id", id)
+		slog.Error("failed to parse chat", "id", id, "with", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 	return
