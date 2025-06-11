@@ -52,7 +52,6 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		chat.Title = "Test title"
 	case nil:
 		slog.Info("found chat", "title", chat.Title)
-		break
 	default:
 		slog.Error("failed to find chat", "err", fmt.Sprintf("%#v", err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
