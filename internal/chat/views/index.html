@@ -17,7 +17,7 @@
       hx-target="#messages"
       hx-on::after-request="if(event.detail.successful) this.reset()"
     >
-      <input id="prompt" name="prompt" type="text" placeholder="Prompt...">
+      <input id="prompt" name="prompt" type="text" required placeholder="Prompt...">
       <button type="submit">Send</button>
     </form>
   </body>
