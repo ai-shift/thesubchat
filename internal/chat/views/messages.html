@@ -1,0 +1,5 @@
+{{ block "messages" . }}
+{{range .}}
+<p><span>{{ .Role }}: </span>{{ .Text }}</p>
+{{end}}
+{{end}}

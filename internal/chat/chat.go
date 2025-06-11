@@ -36,14 +36,15 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 
 func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	prompt := r.FormValue("prompt")
-	resp, err := h.llm.Eval(prompt)
+	msgs := []llm.Message{llm.Message{Text: prompt, Role: "user"}}
+	msgs, err := h.llm.Eval(msgs)
 	if err != nil {
 		slog.Error("failed to get eval prompt", "prompt", prompt, "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	slog.Info("user prompt", "prompt", prompt)
-	err = h.templates.Render(w, "message", resp)
+	err = h.templates.Render(w, "messages", msgs)
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)

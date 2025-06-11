@@ -13,8 +13,9 @@ type LLM struct {
 	g   *genkit.Genkit
 }
 
-type Response struct {
+type Message struct {
 	Text string
+	Role string
 }
 
 func New(ctx context.Context) *LLM {
@@ -31,12 +32,15 @@ func New(ctx context.Context) *LLM {
 	}
 }
 
-func (m LLM) Eval(prompt string) (*Response, error) {
-	resp, err := genkit.Generate(m.ctx, m.g, ai.WithPrompt(prompt))
+func (m LLM) Eval(msgs []Message) ([]Message, error) {
+	resp, err := genkit.Generate(m.ctx, m.g, ai.WithPrompt(msgs[len(msgs)-1].Text))
 	if err != nil {
-		return nil, err
+		return msgs, err
 	}
-	return &Response{
+	msg := Message{
 		Text: resp.Text(),
-	}, nil
+		Role: "assistant",
+	}
+	msgs = append(msgs, msg)
+	return msgs, nil
 }
