@@ -94,7 +94,6 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("got chat", "chat", fmt.Sprintf("%#v", chat))
 	// Eval prompt
 	chat.Messages, err = h.llm.Eval(append(chat.Messages, llm.Message{Text: prompt, Role: "user"}))
 	if err != nil {
