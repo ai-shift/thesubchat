@@ -1,4 +1,4 @@
-{{ block "index" . }}
+{{ define "index" }}
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -11,9 +11,10 @@
   <body>
     <h1>Hello, there!</h1>
     <div id="messages">
+      {{template "messages" .Messages}}
     </div>
     <form
-      hx-post="user/message"
+      hx-post="{{ .ID }}/user/message"
       hx-target="#messages"
       hx-on::after-request="if(event.detail.successful) this.reset()"
     >

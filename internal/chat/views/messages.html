@@ -1,4 +1,4 @@
-{{ block "messages" . }}
+{{ define "messages" }}
 {{range .}}
 <p><span>{{ .Role }}: </span>{{ .Text }}</p>
 {{end}}

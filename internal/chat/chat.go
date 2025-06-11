@@ -11,6 +11,7 @@ import (
 	"shellshift/internal/chat/llm"
 	"shellshift/internal/db"
 	"shellshift/internal/templates"
+	"strconv"
 )
 
 type ChatHandler struct {
@@ -29,13 +30,35 @@ func InitMux(q *db.Queries) *http.ServeMux {
 		q:         q,
 	}
 	m := http.NewServeMux()
-	m.HandleFunc("GET /", h.getChat)
-	m.HandleFunc("POST /user/message", h.postUserMessage)
+	m.HandleFunc("GET /{id}", h.getChat)
+	m.HandleFunc("POST /{id}/user/message", h.postUserMessage)
 	return m
 }
 
 func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
-	err := h.templates.Render(w, "index", nil)
+	slog.Info("getting chat")
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		slog.Error("failed to parse chat id", "id", id)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	chat, err := h.q.FindChat(h.ctx, id)
+	if err != nil {
+		slog.Error("chat wasn't found", "id", id)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	var msgs []llm.Message
+	err = json.Unmarshal(chat.Messages, &msgs)
+	if err != nil {
+		slog.Error("failed to decode chat messages", "err", err.Error())
+		return
+	}
+	err = h.templates.Render(w, "index", struct {
+		Messages []llm.Message
+		ID       int64
+	}{Messages: msgs, ID: id})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -44,7 +67,12 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 
 func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	// Get chat
-	chat, err := h.q.FindChat(h.ctx, 1)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	chat, err := h.q.FindChat(h.ctx, id)
 	switch err {
 	case sql.ErrNoRows:
 		slog.Info("creating new chat")
@@ -96,5 +124,4 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to render index page", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
 }
