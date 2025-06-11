@@ -33,7 +33,11 @@ func New(ctx context.Context) *LLM {
 }
 
 func (m LLM) Eval(msgs []Message) ([]Message, error) {
-	resp, err := genkit.Generate(m.ctx, m.g, ai.WithPrompt(msgs[len(msgs)-1].Text))
+	mapped := make([]*ai.Message, len(msgs))
+	for i, msg := range msgs {
+		mapped[i] = ai.NewTextMessage(ai.Role(msg.Role), msg.Text)
+	}
+	resp, err := genkit.Generate(m.ctx, m.g, ai.WithMessages(mapped...))
 	if err != nil {
 		return msgs, err
 	}
