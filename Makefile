@@ -30,4 +30,4 @@ install:
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 
 run: lint
-	go run ./main.go
+	go run ./cmd/server/main.go
