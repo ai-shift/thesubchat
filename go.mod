@@ -2,14 +2,19 @@ module shellshift
 
 go 1.24.3
 
-require github.com/firebase/genkit/go v0.5.4
+require (
+	github.com/firebase/genkit/go v0.5.4
+	github.com/tursodatabase/libsql-client-go v0.0.0-20240902231107-85af5b9d094d
+)
 
 require (
 	cloud.google.com/go v0.118.0 // indirect
 	cloud.google.com/go/auth v0.16.0 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
+	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
+	github.com/coder/websocket v1.8.12 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
