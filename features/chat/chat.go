@@ -43,8 +43,8 @@ func InitMux(q *db.Queries) *http.ServeMux {
 	m := http.NewServeMux()
 	m.HandleFunc("GET /{id}", h.getChat)
 	m.HandleFunc("GET /", h.getEmptyChat)
-	m.HandleFunc("POST /{id}/user/message", h.postUserMessage)
-	m.HandleFunc("GET /{id}/assistant/message", h.getMessageStream)
+	m.HandleFunc("POST /{id}/message", h.postUserMessage)
+	m.HandleFunc("GET /{id}/message", h.getMessageStream)
 	return m
 }
 

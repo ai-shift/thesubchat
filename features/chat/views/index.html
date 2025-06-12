@@ -14,7 +14,7 @@
 	{{template "messages" .}}
       </div>
       <form
-	hx-post="{{ .ID }}/user/message"
+	hx-post="{{ .ID }}/message"
 	hx-target="#messages"
 	hx-on::after-request="if(event.detail.successful) this.reset()"
       >
