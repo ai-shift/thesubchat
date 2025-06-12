@@ -6,15 +6,22 @@
       {{block "meta" .}}{{end}}
     </head>
     <body>
-      <h1>{{.Title}}</h1>
+      <div class="flex justify-between items-center bg-gray-200">
+	{{if .Title}}
+	  <h1>{{.Title}}</h1>
+	  <div hx-get="{{.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
+	{{else}}
+	  <h1>New chat</h1>
+	{{end}}
+      </div>
       {{if .Messages}}
 	<a href="/chat">Start a new chat</a>
       {{end}}
       <div id="messages">
-	{{template "messages" .Messages}}
+	{{template "messages" .}}
       </div>
       <form
-	hx-post="{{ .ID }}/user/message"
+	hx-post="{{ .ID }}/message"
 	hx-target="#messages"
 	hx-on::after-request="if(event.detail.successful) this.reset()"
       >

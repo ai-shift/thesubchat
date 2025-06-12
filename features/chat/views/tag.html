@@ -1,0 +1,21 @@
+{{define "tag"}}
+  <form
+    id="tag-{{.Name}}"
+    hx-delete="{{.ChatID}}/tags"
+    hx-target="#tag-{{.Name}}"
+    hx-swap="delete"
+  >
+    <input
+      hx-post="{{.ChatID}}/tags"
+      type="text"
+      name="tag"
+      value="{{.Name}}"
+    />
+    <button
+      type="submit"
+      class="px-1.5 bg-red-100 cursor-pointer"
+    >
+      x
+    </button>
+  </form>
+{{end}}

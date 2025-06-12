@@ -1,5 +1,7 @@
 {{ define "messages" }}
-  {{range .}}
-    <p><span>{{ .Role }}: </span>{{ .Text }}</p>
+  {{range .Messages}}
+    {{block "message" .}}{{end}}
   {{end}}
+  <div hx-ext="sse" sse-connect="{{.ID}}/message" sse-swap="chunk">
+  </div>
 {{end}}
