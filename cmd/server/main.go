@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"shellshift/features/chat"
+	"shellshift/features/graph"
 	"shellshift/internal/db"
 	"shellshift/internal/factory"
 )
@@ -13,6 +14,7 @@ func main() {
 	conn := factory.GetDB()
 	q := db.New(conn)
 	m.Handle("/chat/", http.StripPrefix("/chat", chat.InitMux(q)))
+	m.Handle("/graph/", http.StripPrefix("/graph", graph.InitMux(q)))
 	slog.Info("site running on port 3000...")
 	if err := http.ListenAndServe(":3000", m); err != nil {
 		slog.Error("serving finished with", "err", err.Error())
