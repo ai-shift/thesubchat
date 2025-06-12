@@ -4,7 +4,6 @@ package chat
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
@@ -13,6 +12,7 @@ import (
 	"net/http"
 	"shellshift/features/chat/schats"
 	"shellshift/internal/db"
+	"shellshift/internal/sse"
 	"shellshift/internal/templates"
 )
 
@@ -92,9 +92,6 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// Maybe title generation
 	errChan := make(chan error)
 	tChan := make(chan string)
@@ -111,40 +108,36 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			ID:       id,
 			Messages: make([]Message, 0),
 		}
-		go func() {
+		go func(ctx context.Context) {
 			t, err := genTitle(ctx, h.g, prompt)
 			if err != nil {
 				errChan <- err
 			} else {
 				tChan <- t
 			}
-		}()
+		}(r.Context())
 	default:
 		slog.Error("failed to find chat", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
+	chat.Messages = append(chat.Messages, Message{Text: prompt, Role: "user"})
+
 	// Eval prompt
 	// TODO: Add timeout
 	c := h.sc.Alloc(chat.ID)
-	msgContext := context.Background()
-	chat.Messages = append(chat.Messages, Message{Text: prompt, Role: "user"})
 	go func(ctx context.Context, chat *Chat) {
-		err := generateMessage(ctx, h.g, chat.Messages, c)
+		msg, err := generateMessage(ctx, h.g, chat.Messages, c)
+		close(c)
 		if err != nil {
 			slog.Error("failed to generate message", "with", err)
+			return
 		}
+		chat.Messages = append(chat.Messages, msg)
+		saveChat(ctx, h.q, *chat)
 		slog.Error("message generation was finished")
-	}(msgContext, chat)
-
-	// Persist new messages
-	encoded, err := json.Marshal(chat.Messages)
-	if err != nil {
-		slog.Error("failed to encode messages", "err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	}(context.Background(), chat)
 
 	if waitTitle {
 		slog.Info("waiting for the title generation")
@@ -157,18 +150,6 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-	}
-
-	slog.Info("saving chat", "id", chat.ID)
-	err = h.q.SaveChat(ctx, db.SaveChatParams{
-		ID:       chat.ID.String(),
-		Title:    chat.Title,
-		Messages: encoded,
-	})
-	if err != nil {
-		slog.Error("failed to save chat", "err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 
 	// Redirect to the new page
@@ -200,13 +181,21 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no active stream", http.StatusNotFound)
 		return
 	}
+
 	var msg string
 	for chunk := range c {
 		msg += chunk
-		fmt.Fprintf(w, "data: %s\n\n", msg)
-		w.(http.Flusher).Flush()
+		sse.Send(w, sse.Event{
+			Type: "chunk",
+			Data: msg,
+		})
 	}
-	h.sc.Free(id)
+
+	sse.Send(w, sse.Event{
+		Type: "finished",
+		Data: "",
+	})
+
 	<-r.Context().Done()
 }
 

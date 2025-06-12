@@ -51,13 +51,33 @@ func genTitle(ctx context.Context, g *genkit.Genkit, msg string) (string, error)
 	return resp.Text(), err
 }
 
-func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, s chan<- string) error {
+func saveChat(ctx context.Context, q *db.Queries, c Chat) error {
+	slog.Info("saving cchat", "id", c.ID)
+	encoded, err := json.Marshal(c.Messages)
+	if err != nil {
+		slog.Error("failed to encode messages", "err", err)
+		return err
+	}
+	err = q.SaveChat(ctx, db.SaveChatParams{
+		ID:       c.ID.String(),
+		Title:    c.Title,
+		Messages: encoded,
+	})
+	if err != nil {
+		slog.Error("failed to save c", "err", err)
+		return err
+	}
+	return nil
+
+}
+
+func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, s chan<- string) (msg Message, err error) {
 	slog.Info("Starting message generation")
 	mapped := make([]*ai.Message, len(msgs))
 	for i, msg := range msgs {
 		mapped[i] = ai.NewTextMessage(ai.Role(msg.Role), msg.Text)
 	}
-	_, err := genkit.Generate(ctx, g,
+	resp, err := genkit.Generate(ctx, g,
 		ai.WithMessages(mapped...),
 		ai.WithStreaming(func(ctx context.Context, chunk *ai.ModelResponseChunk) error {
 			s <- chunk.Text()
@@ -65,7 +85,9 @@ func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, s ch
 		}),
 	)
 	if err != nil {
-		return err
+		return
 	}
-	return nil
+	msg.Role = "assistant"
+	msg.Text = resp.Text()
+	return
 }

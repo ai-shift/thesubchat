@@ -24,12 +24,6 @@ func (s *StreamedChats) Alloc(id uuid.UUID) chan string {
 	return c
 }
 
-func (s *StreamedChats) Free(id uuid.UUID) {
-	s.l.Lock()
-	defer s.l.Unlock()
-	s.c[id] = nil
-}
-
 func (s *StreamedChats) Get(id uuid.UUID) (c chan string, ok bool) {
 	s.l.RLock()
 	defer s.l.RUnlock()
