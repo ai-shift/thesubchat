@@ -3,7 +3,7 @@ package main
 import (
 	"log/slog"
 	"net/http"
-	"shellshift/internal/chat"
+	"shellshift/features/chat"
 	"shellshift/internal/db"
 	"shellshift/internal/factory"
 )

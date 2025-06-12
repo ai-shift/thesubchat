@@ -34,8 +34,7 @@ func InitMux(q *db.Queries) *http.ServeMux {
 		panic(fmt.Sprintf("could not initialize Genkit: %v", err))
 	}
 	h := ChatHandler{
-		ctx:       ctx,
-		templates: templates.New("internal/chat/views/*.html"),
+		templates: templates.New("features/chat/views/*.html"),
 		llm:       llm.New(ctx),
 		q:         q,
 		g:         g,
@@ -87,6 +86,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -99,7 +99,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	chat, err := findChat(h.q, id)
 	switch err {
 	case nil:
-		tChan <- chat.Title
+		break
 	case sql.ErrNoRows:
 		waitTitle = true
 		chat = &Chat{
