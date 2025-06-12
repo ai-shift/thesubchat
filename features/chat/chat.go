@@ -2,7 +2,6 @@
 package chat
 
 import (
-  "strings"
 	"bytes"
 	"context"
 	"database/sql"
@@ -16,6 +15,7 @@ import (
 	"shellshift/internal/db"
 	"shellshift/internal/sse"
 	"shellshift/internal/templates"
+	"strings"
 )
 
 type ChatHandler struct {
@@ -148,6 +148,9 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		case title := <-tChan:
 			slog.Info("title generated")
 			chat.Title = title
+      // TODO: Save only title
+			saveChat(r.Context(), h.q, *chat)
+			slog.Info("Chat saved")
 		case err := <-errChan:
 			slog.Error("failed to generate title", "with", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -197,7 +200,6 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 
 	for chunk := range stream.Chunks {
 		msg.Text += chunk
-    slog.Info("Writing chunk", "msg", fmt.Sprintf("%#v", msg))
 		var tpl bytes.Buffer
 		if err := h.templates.Render(&tpl, "message", msg); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -205,7 +207,7 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 		}
 		sse.Send(w, sse.Event{
 			Type: "chunk",
-			Data:  strings.Replace(tpl.String(), "\n", "<br>", -1),
+			Data: strings.Replace(tpl.String(), "\n", "<br>", -1),
 		})
 	}
 
