@@ -5,9 +5,11 @@
 package db
 
 type Chat struct {
-	ID       string
-	Title    string
-	Messages []byte
+	ID        string
+	Title     string
+	Messages  []byte
+	CreatedAt int64
+	UpdatedAt int64
 }
 
 type SchemaMigration struct {

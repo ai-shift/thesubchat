@@ -39,7 +39,8 @@ VALUES
 UPDATE
 SET
     title = excluded.title,
-    messages = excluded.messages
+    messages = excluded.messages,
+    upated_at = unixepoch()
 `
 
 type SaveChatParams struct {
