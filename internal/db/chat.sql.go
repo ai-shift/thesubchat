@@ -9,6 +9,24 @@ import (
 	"context"
 )
 
+const deleteTag = `-- name: DeleteTag :exec
+DELETE FROM
+    chat_tag
+WHERE
+    chat_id = ?
+    AND name = ?
+`
+
+type DeleteTagParams struct {
+	ChatID string
+	Name   string
+}
+
+func (q *Queries) DeleteTag(ctx context.Context, arg DeleteTagParams) error {
+	_, err := q.db.ExecContext(ctx, deleteTag, arg.ChatID, arg.Name)
+	return err
+}
+
 const findChat = `-- name: FindChat :one
 SELECT
     title,

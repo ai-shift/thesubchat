@@ -31,3 +31,10 @@ FROM
     chat_tag
 WHERE
     chat_id = ?;
+
+-- name: DeleteTag :exec
+DELETE FROM
+    chat_tag
+WHERE
+    chat_id = ?
+    AND name = ?;

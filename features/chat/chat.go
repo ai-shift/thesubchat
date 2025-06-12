@@ -47,6 +47,7 @@ func InitMux(q *db.Queries) *http.ServeMux {
 	m.HandleFunc("GET /{id}/message", h.getMessageStream)
 	m.HandleFunc("GET /{id}/tags", h.getTags)
 	m.HandleFunc("POST /{id}/tags", h.postTags)
+	m.HandleFunc("DELETE /{id}/tags", h.deleteTags)
 	return m
 }
 
@@ -303,6 +304,29 @@ func (h ChatHandler) getTags(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("failed to render tempalte", "with", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (h ChatHandler) deleteTags(w http.ResponseWriter, r *http.Request) {
+	// Validate data
+	id, err := deserID(w, r)
+	if err != nil {
+		return
+	}
+	tag, ok := deserTag(w, r)
+	if !ok {
+		return
+	}
+
+	// Delete tag
+	err = h.q.DeleteTag(r.Context(), db.DeleteTagParams{
+		ChatID: id.String(),
+		Name:   tag,
+	})
+	if err != nil {
+		slog.Error("failed to delete tag", "tag", tag, "with", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
