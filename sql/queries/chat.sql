@@ -16,4 +16,4 @@ UPDATE
 SET
     title = excluded.title,
     messages = excluded.messages,
-    upated_at = unixepoch();
+    updated_at = unixepoch();
