@@ -45,6 +45,8 @@ func InitMux(q *db.Queries) *http.ServeMux {
 	m.HandleFunc("GET /", h.getEmptyChat)
 	m.HandleFunc("POST /{id}/message", h.postUserMessage)
 	m.HandleFunc("GET /{id}/message", h.getMessageStream)
+	m.HandleFunc("GET /{id}/tags", h.getTags)
+	m.HandleFunc("POST /{id}/tags", h.postTags)
 	return m
 }
 
@@ -71,8 +73,7 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 
 func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 	err := h.templates.Render(w, "index", Chat{
-		Title: "New chat",
-		ID:    uuid.New(),
+		ID: uuid.New(),
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
@@ -220,6 +221,93 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 	<-r.Context().Done()
 }
 
+type ChatTags struct {
+	ID   string
+	Tags []Tag
+}
+
+type Tag struct {
+	ChatID string
+	Name   string
+}
+
+func (h ChatHandler) postTags(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Adding new tag")
+	// Validate data
+	id, err := deserID(w, r)
+	if err != nil {
+		return
+	}
+	tag, ok := deserTag(w, r)
+	if !ok {
+		return
+	}
+
+	// Persist tag
+	err = h.q.SaveTag(r.Context(), db.SaveTagParams{
+		ChatID: id.String(),
+		Name:   tag,
+	})
+	switch err {
+	case nil:
+		break
+	default:
+		slog.Error("failed to save tag", "with", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Render new tag
+	err = h.templates.Render(w, "tag", Tag{
+		ChatID: id.String(),
+		Name:   tag,
+	})
+	if err != nil {
+		slog.Error("failed to render tag", "with", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (h ChatHandler) getTags(w http.ResponseWriter, r *http.Request) {
+	slog.Info("search for tags")
+	// Validate data
+	id, err := deserID(w, r)
+	if err != nil {
+		return
+	}
+
+	rows, err := h.q.FindTags(r.Context(), id.String())
+	switch err {
+	case nil:
+		break
+	case sql.ErrNoRows:
+		break
+	default:
+		slog.Error("failed to find tags", "with", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	tags := make([]Tag, len(rows))
+	for i, name := range rows {
+		tags[i] = Tag{
+			ChatID: id.String(),
+			Name:   name,
+		}
+	}
+
+	err = h.templates.Render(w, "tags", ChatTags{
+		ID:   id.String(),
+		Tags: tags,
+	})
+	if err != nil {
+		slog.Error("failed to render tempalte", "with", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func deserID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, err error) {
 	id, err = uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -227,4 +315,17 @@ func deserID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, err error) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 	return
+}
+
+func deserTag(w http.ResponseWriter, r *http.Request) (tag string, ok bool) {
+	tag = r.FormValue("tag")
+	if tag == "" {
+		http.Error(w, "Tag can not be empty", http.StatusBadRequest)
+		return
+	}
+	if len(tag) > 30 {
+		http.Error(w, "Tag should not be larger than 30 chars", http.StatusBadRequest)
+		return
+	}
+	return tag, true
 }

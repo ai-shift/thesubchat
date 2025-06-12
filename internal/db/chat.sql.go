@@ -31,6 +31,38 @@ func (q *Queries) FindChat(ctx context.Context, id string) (FindChatRow, error) 
 	return i, err
 }
 
+const findTags = `-- name: FindTags :many
+SELECT
+    name
+FROM
+    chat_tag
+WHERE
+    chat_id = ?
+`
+
+func (q *Queries) FindTags(ctx context.Context, chatID string) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, findTags, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const saveChat = `-- name: SaveChat :exec
 INSERT INTO
     chat (id, title, messages)
@@ -51,5 +83,22 @@ type SaveChatParams struct {
 
 func (q *Queries) SaveChat(ctx context.Context, arg SaveChatParams) error {
 	_, err := q.db.ExecContext(ctx, saveChat, arg.ID, arg.Title, arg.Messages)
+	return err
+}
+
+const saveTag = `-- name: SaveTag :exec
+INSERT INTO
+    chat_tag (chat_id, name)
+VALUES
+    (?, ?)
+`
+
+type SaveTagParams struct {
+	ChatID string
+	Name   string
+}
+
+func (q *Queries) SaveTag(ctx context.Context, arg SaveTagParams) error {
+	_, err := q.db.ExecContext(ctx, saveTag, arg.ChatID, arg.Name)
 	return err
 }

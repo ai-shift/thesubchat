@@ -12,6 +12,11 @@ type Chat struct {
 	UpdatedAt int64
 }
 
+type ChatTag struct {
+	ChatID string
+	Name   string
+}
+
 type SchemaMigration struct {
 	ID string
 }

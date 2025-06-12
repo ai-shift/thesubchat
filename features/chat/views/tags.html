@@ -1,0 +1,17 @@
+{{define "tags"}}
+  <div class="flex flex-col space-y-2 p-2">
+    <div class="flex flex-col space-y-2" id="saved-tags">
+      {{range .Tags}}
+	{{block "tag" .}}{{end}}
+      {{end}}
+    </div>
+    <form
+      hx-post="{{.ID}}/tags"
+      hx-target="#saved-tags"
+      hx-swap="beforeend"
+      hx-on::after-request="if(event.detail.successful) this.reset()"
+    >
+      <input type="text" id="tag" name="tag" placeholder="Add new tag" />
+    </form>
+  </div>
+{{end}}

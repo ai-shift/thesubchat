@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS chat (
 );
 
 CREATE TABLE chat_tag (
-    chat_id text,
-    name text NOT NULL UNIQUE,
+    chat_id text NOT NULL,
+    name text NOT NULL,
+    PRIMARY KEY (chat_id, name),
     FOREIGN KEY (chat_id) REFERENCES chat (id)
 );
