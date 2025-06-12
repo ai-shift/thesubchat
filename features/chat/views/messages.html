@@ -1,7 +1,16 @@
 {{ define "messages" }}
-  {{range .Messages}}
-    {{block "message" .}}{{end}}
-  {{end}}
-  <div hx-ext="sse" sse-connect="{{.ID}}/message" sse-swap="chunk">
+  <div class="overflow-auto grow p-2 space-y-2" id="messages">
+    <script>
+     document.addEventListener("htmx:sseMessage", e => {
+       console.log("Got message", e)
+       const messagesDiv = document.getElementById("messages");
+       messagesDiv.scrollTop = messagesDiv.scrollHeight;
+     })
+    </script>
+    {{range .Messages}}
+      {{block "message" .}}{{end}}
+    {{end}}
+    <div hx-ext="sse" sse-connect="{{.ID}}/message" sse-swap="chunk">
+    </div>
   </div>
 {{end}}
