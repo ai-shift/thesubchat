@@ -11,17 +11,20 @@ import (
 
 const getGraph = `-- name: GetGraph :many
 SELECT
-    id,
-    title
+    c.id,
+    c.title,
+    c.updated_at,
+    t.name
 FROM
-    chat
-ORDER BY
-    updated_at DESC
+    chat_tag t
+    INNER JOIN chat c ON t.chat_id = c.id
 `
 
 type GetGraphRow struct {
-	ID    string
-	Title string
+	ID        string
+	Title     string
+	UpdatedAt int64
+	Name      string
 }
 
 func (q *Queries) GetGraph(ctx context.Context) ([]GetGraphRow, error) {
@@ -33,7 +36,12 @@ func (q *Queries) GetGraph(ctx context.Context) ([]GetGraphRow, error) {
 	var items []GetGraphRow
 	for rows.Next() {
 		var i GetGraphRow
-		if err := rows.Scan(&i.ID, &i.Title); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.UpdatedAt,
+			&i.Name,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -1,8 +1,9 @@
 -- name: GetGraph :many
 SELECT
-    id,
-    title
+    c.id,
+    c.title,
+    c.updated_at,
+    t.name
 FROM
-    chat
-ORDER BY
-    updated_at DESC;
+    chat_tag t
+    INNER JOIN chat c ON t.chat_id = c.id;

@@ -20,8 +20,3 @@ type ChatTag struct {
 type SchemaMigration struct {
 	ID string
 }
-
-type SqliteSequence struct {
-	Name interface{}
-	Seq  interface{}
-}
