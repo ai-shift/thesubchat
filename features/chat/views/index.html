@@ -5,28 +5,29 @@
       <title>Shell>> chat</title>
       {{block "meta" .}}{{end}}
     </head>
-    <body>
-      <div class="flex justify-between items-center bg-gray-200">
+    <body class="flex flex-col flex-grow h-screen">
+      <header class="flex justify-between items-center bg-gray-200">
 	{{if .Title}}
 	  <h1>{{.Title}}</h1>
 	  <div hx-get="{{.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
 	{{else}}
 	  <h1>New chat</h1>
 	{{end}}
-      </div>
-      {{if .Messages}}
-	<a href="/chat">Start a new chat</a>
-      {{end}}
-      <div id="messages">
-	{{template "messages" .}}
-      </div>
+	{{if .Messages}}
+	  <a href="/chat" class="bg-blue-300 p-2">Start a new chat</a>
+	{{end}}
+      </header>
+      {{template "messages" .}}
       <form
 	hx-post="{{ .ID }}/message"
 	hx-target="#messages"
 	hx-on::after-request="if(event.detail.successful) this.reset()"
+	class="flex items-center justify-center bg-gray-400 p-4"
       >
-	<input id="prompt" name="prompt" type="text" required placeholder="Prompt...">
-	<button type="submit">Send</button>
+	<div class="">
+	  <input id="prompt" name="prompt" type="text" required placeholder="Prompt...">
+	  <button type="submit">Send</button>
+	</div>
       </form>
     </body>
   </html>
