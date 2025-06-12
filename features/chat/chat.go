@@ -126,17 +126,17 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Eval prompt
-  // TODO: Add timeout
+	// TODO: Add timeout
 	c := h.sc.Alloc(chat.ID)
 	msgContext := context.Background()
-  chat.Messages = append(chat.Messages, Message{Text: prompt, Role: "user"})
-	go func(ctx context.Context) {
+	chat.Messages = append(chat.Messages, Message{Text: prompt, Role: "user"})
+	go func(ctx context.Context, chat *Chat) {
 		err := generateMessage(ctx, h.g, chat.Messages, c)
 		if err != nil {
 			slog.Error("failed to generate message", "with", err)
 		}
-    slog.Error("message generation was finished")
-	}(msgContext)
+		slog.Error("message generation was finished")
+	}(msgContext, chat)
 
 	// Persist new messages
 	encoded, err := json.Marshal(chat.Messages)
