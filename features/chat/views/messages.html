@@ -1,8 +1,9 @@
 {{ define "messages" }}
   {{range .Messages}}
-    <p><span>{{.Role}}: </span>{{.Text}}</p>
+    {{block "message" .}}{{end}}
   {{end}}
-  <div hx-ext="sse" sse-connect="{{.ID}}/assistant/message" sse-swap="message">
-    Streaming message
+  <div id="msg-stream" hx-trigger="sse:end" hx-delete="#msg-stream">
+    <div hx-ext="sse" sse-connect="{{.ID}}/assistant/message" sse-swap="chunk">
+    </div>
   </div>
 {{end}}

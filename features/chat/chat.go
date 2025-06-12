@@ -2,6 +2,8 @@
 package chat
 
 import (
+  "strings"
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -126,16 +128,17 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Eval prompt
 	// TODO: Add timeout
-	c := h.sc.Alloc(chat.ID)
+	stream := h.sc.Alloc(chat.ID)
 	go func(ctx context.Context, chat *Chat) {
-		msg, err := generateMessage(ctx, h.g, chat.Messages, c)
-		close(c)
+		msg, err := generateMessage(ctx, h.g, chat.Messages, stream.Chunks)
+		close(stream.Chunks)
 		if err != nil {
 			slog.Error("failed to generate message", "with", err)
 			return
 		}
 		chat.Messages = append(chat.Messages, msg)
 		saveChat(ctx, h.q, *chat)
+		stream.Done <- struct{}{}
 		slog.Error("message generation was finished")
 	}(context.Background(), chat)
 
@@ -174,23 +177,39 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 
 	id, err := deserID(w, r)
 	if err != nil {
-		return
-	}
-	c, ok := h.sc.Get(id)
-	if !ok {
-		http.Error(w, "no active stream", http.StatusNotFound)
+		slog.Error("got invalid chat id", "val", id)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	var msg string
-	for chunk := range c {
-		msg += chunk
+	stream, ok := h.sc.Get(id)
+	if !ok {
+		sse.Send(w, sse.Event{
+			Type: "end",
+			Data: "There is no stream",
+		})
+		return
+	}
+
+	msg := &Message{
+		Role: "assistant",
+	}
+
+	for chunk := range stream.Chunks {
+		msg.Text += chunk
+    slog.Info("Writing chunk", "msg", fmt.Sprintf("%#v", msg))
+		var tpl bytes.Buffer
+		if err := h.templates.Render(&tpl, "message", msg); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		sse.Send(w, sse.Event{
 			Type: "chunk",
-			Data: msg,
+			Data:  strings.Replace(tpl.String(), "\n", "<br>", -1),
 		})
 	}
 
+	<-stream.Done
 	sse.Send(w, sse.Event{
 		Type: "finished",
 		Data: "",
