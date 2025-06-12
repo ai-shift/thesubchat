@@ -11,14 +11,12 @@ import (
 	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
-	"shellshift/features/chat/llm"
 	"shellshift/internal/db"
 	"shellshift/internal/templates"
 )
 
 type ChatHandler struct {
 	templates *templates.Templates
-	llm       *llm.LLM
 	q         *db.Queries
 	g         *genkit.Genkit
 }
@@ -34,7 +32,6 @@ func InitMux(q *db.Queries) *http.ServeMux {
 	}
 	h := ChatHandler{
 		templates: templates.New("features/chat/views/*.html"),
-		llm:       llm.New(ctx),
 		q:         q,
 		g:         g,
 	}
@@ -103,7 +100,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		waitTitle = true
 		chat = &Chat{
 			ID:       id,
-			Messages: make([]llm.Message, 0),
+			Messages: make([]Message, 0),
 		}
 		go func() {
 			t, err := genTitle(ctx, h.g, prompt)
@@ -120,7 +117,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Eval prompt
-	chat.Messages, err = h.llm.Eval(append(chat.Messages, llm.Message{Text: prompt, Role: "user"}))
+	chat.Messages, err = generateMessage(ctx, h.g, append(chat.Messages, Message{Text: prompt, Role: "user"}))
 	if err != nil {
 		slog.Error("failed to get eval prompt", "prompt", prompt, "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)

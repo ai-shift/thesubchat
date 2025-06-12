@@ -7,14 +7,18 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/google/uuid"
 	"log/slog"
-	"shellshift/features/chat/llm"
 	"shellshift/internal/db"
 )
 
 type Chat struct {
 	ID       uuid.UUID
 	Title    string
-	Messages []llm.Message
+	Messages []Message
+}
+
+type Message struct {
+	Text string
+	Role string
 }
 
 func findChat(q *db.Queries, id uuid.UUID) (*Chat, error) {
@@ -23,7 +27,7 @@ func findChat(q *db.Queries, id uuid.UUID) (*Chat, error) {
 	if err != nil {
 		return nil, err
 	}
-	var msgs []llm.Message
+	var msgs []Message
 	err = json.Unmarshal(chat.Messages, &msgs)
 	if err != nil {
 		return nil, err
@@ -45,4 +49,21 @@ func genTitle(ctx context.Context, g *genkit.Genkit, msg string) (string, error)
 		return "", err
 	}
 	return resp.Text(), err
+}
+
+func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message) ([]Message, error) {
+	mapped := make([]*ai.Message, len(msgs))
+	for i, msg := range msgs {
+		mapped[i] = ai.NewTextMessage(ai.Role(msg.Role), msg.Text)
+	}
+	resp, err := genkit.Generate(ctx, g, ai.WithMessages(mapped...))
+	if err != nil {
+		return msgs, err
+	}
+	msg := Message{
+		Text: resp.Text(),
+		Role: "assistant",
+	}
+	msgs = append(msgs, msg)
+	return msgs, nil
 }
