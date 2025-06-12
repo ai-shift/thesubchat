@@ -148,7 +148,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		case title := <-tChan:
 			slog.Info("title generated")
 			chat.Title = title
-      // TODO: Save only title
+			// TODO: Save only title
 			saveChat(r.Context(), h.q, *chat)
 			slog.Info("Chat saved")
 		case err := <-errChan:
