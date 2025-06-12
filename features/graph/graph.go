@@ -29,7 +29,7 @@ func InitMux(q *db.Queries, chatURI string) *http.ServeMux {
 
 type Graph struct {
 	ChatURI string
-	Chats   []db.GetGraphRow
+	Graph   []any
 }
 
 func (h GraphHandler) getGraph(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +45,7 @@ func (h GraphHandler) getGraph(w http.ResponseWriter, r *http.Request) {
 
 	err = h.t.Render(w, "index", Graph{
 		ChatURI: h.chatURI,
-		Chats:   chats,
+		Graph:   buildGraph(chats),
 	})
 
 	if err != nil {

@@ -10,27 +10,13 @@
       <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
     </head>
     <body>
-      <ul>
-        {{range .Chats}}
-          <li>
-            <a href="{{$.ChatURI}}/{{.ID}}">
-              {{.Title}}
-            </a>
-          </li>
-        {{end}}
-      </ul>
-      <div id="graph" style="width:full;height:50dvh;"></div>
+      <div id="graph" style="width:full;height:100dvh;"></div>
     </body>
     <script type="text/javascript">
-     const chats = {{.Chats}}
+     const elements = {{.Graph}}
+       console.log(elements)
 
-      const elements = chats.map((item) => ({
-         data: {
-           id: item.ID
-         }
-       }))
-
-      var cy = cytoscape({
+       var cy = cytoscape({
       container: document.getElementById('graph'),
         elements,
         style: [
@@ -47,15 +33,15 @@
                      'width': 3,
                      'line-color': '#ccc',
                      'target-arrow-color': '#ccc',
-                     'target-arrow-shape': 'triangle',
                      'curve-style': 'bezier'
                    }
                  }
         ],
         layout: {
           name: 'fcose',
+          idealEdgeLength: edge => 150,
         }
-      });
+       });
 
      const lastUsed = cy.$id(elements[0].data.id)
      cy.center(lastUsed)
