@@ -14,16 +14,16 @@ type EdgeData struct {
 	ID     string `json:"id"`
 	Source string `json:"source"`
 	Target string `json:"target"`
-  Tag string `json:"tag"`
+	Tag    string `json:"tag"`
 }
 
 type Node struct {
-	Group string `json:"group"`
+	Group string   `json:"group"`
 	Data  NodeData `json:"data"`
 }
 
 type Edge struct {
-	Group string `json:"group"`
+	Group string   `json:"group"`
 	Data  EdgeData `json:"data"`
 }
 
@@ -33,16 +33,6 @@ func buildGraph(chats []db.GetGraphRow) []any {
 	var graph []any
 
 	for _, v := range chats {
-		tag := v.Name
-		id := v.ID
-
-		// Build [tag]:[]ids map
-		if s, ok := m[tag]; !ok {
-			m[tag] = []string{id}
-		} else {
-			m[tag] = append(s, id)
-		}
-
 		// Push nodes to graph slice
 		if !slices.ContainsFunc(graph, func(node any) bool {
 			return node.(Node).Data.ID == v.ID
@@ -53,6 +43,18 @@ func buildGraph(chats []db.GetGraphRow) []any {
 					ID: v.ID,
 				},
 			})
+		}
+
+    if !v.Name.Valid{
+      continue
+    }
+		// Build [tag]:[]ids map
+    tag := v.Name.String
+
+		if s, ok := m[tag]; !ok {
+			m[tag] = []string{v.ID}
+		} else {
+			m[tag] = append(s, v.ID)
 		}
 	}
 
@@ -66,7 +68,7 @@ func buildGraph(chats []db.GetGraphRow) []any {
 						ID:     fmt.Sprintf("%s:%s", ids[i], ids[j]),
 						Source: ids[i],
 						Target: ids[j],
-            Tag: tag,
+						Tag:    tag,
 					},
 				})
 			}

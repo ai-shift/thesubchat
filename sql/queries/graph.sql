@@ -6,4 +6,4 @@ SELECT
     t.name
 FROM
     chat_tag t
-    INNER JOIN chat c ON t.chat_id = c.id;
+    RIGHT JOIN chat c ON t.chat_id = c.id;

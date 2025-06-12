@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 )
 
 const getGraph = `-- name: GetGraph :many
@@ -17,14 +18,14 @@ SELECT
     t.name
 FROM
     chat_tag t
-    INNER JOIN chat c ON t.chat_id = c.id
+    RIGHT JOIN chat c ON t.chat_id = c.id
 `
 
 type GetGraphRow struct {
 	ID        string
 	Title     string
 	UpdatedAt int64
-	Name      string
+	Name      sql.NullString
 }
 
 func (q *Queries) GetGraph(ctx context.Context) ([]GetGraphRow, error) {
