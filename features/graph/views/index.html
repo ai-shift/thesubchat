@@ -1,0 +1,20 @@
+{{define "index"}}
+ <!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <title>Shell>> graph</title>
+      {{block "meta" .}}{{end}}
+    </head>
+    <body>
+      <ul>
+        {{range .Chats}}
+          <li>
+            <a href="{{$.ChatURI}}/{{.ID}}">
+              {{.Title}}
+            </a>
+          </li>
+        {{end}}
+      </ul>
+    </body>
+  </html>
+{{end}}
