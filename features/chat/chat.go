@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
+	"shellshift/features/chat/schats"
 	"shellshift/internal/db"
 	"shellshift/internal/templates"
 )
@@ -19,6 +20,7 @@ type ChatHandler struct {
 	templates *templates.Templates
 	q         *db.Queries
 	g         *genkit.Genkit
+	sc        *schats.StreamedChats
 }
 
 func InitMux(q *db.Queries) *http.ServeMux {
@@ -34,11 +36,13 @@ func InitMux(q *db.Queries) *http.ServeMux {
 		templates: templates.New("features/chat/views/*.html"),
 		q:         q,
 		g:         g,
+		sc:        schats.New(),
 	}
 	m := http.NewServeMux()
 	m.HandleFunc("GET /{id}", h.getChat)
 	m.HandleFunc("GET /", h.getEmptyChat)
 	m.HandleFunc("POST /{id}/user/message", h.postUserMessage)
+	m.HandleFunc("GET /{id}/assistant/message", h.getMessageStream)
 	return m
 }
 
@@ -59,14 +63,19 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
 func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
-	err := h.templates.Render(w, "index", Chat{Title: "New chat", ID: uuid.New()})
+	err := h.templates.Render(w, "index", Chat{
+		Title: "New chat",
+		ID:    uuid.New(),
+	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -117,12 +126,16 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Eval prompt
-	chat.Messages, err = generateMessage(ctx, h.g, append(chat.Messages, Message{Text: prompt, Role: "user"}))
-	if err != nil {
-		slog.Error("failed to get eval prompt", "prompt", prompt, "err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+  // TODO: Add timeout
+	c := h.sc.Alloc(chat.ID)
+	msgContext := context.Background()
+	go func(ctx context.Context) {
+		err := generateMessage(ctx, h.g, append(chat.Messages, Message{Text: prompt, Role: "user"}), c)
+		if err != nil {
+			slog.Error("failed to generate message", "with", err)
+		}
+    slog.Error("message generation was finished")
+	}(msgContext)
 
 	// Persist new messages
 	encoded, err := json.Marshal(chat.Messages)
@@ -165,11 +178,35 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Render messages
-	err = h.templates.Render(w, "messages", chat.Messages)
+	err = h.templates.Render(w, "messages", chat)
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	id, err := deserID(w, r)
+	if err != nil {
+		return
+	}
+	c, ok := h.sc.Get(id)
+	if !ok {
+		http.Error(w, "no active stream", http.StatusNotFound)
+		return
+	}
+	var msg string
+	for chunk := range c {
+		msg += chunk
+		fmt.Fprintf(w, "data: %s\n\n", msg)
+		w.(http.Flusher).Flush()
+	}
+	h.sc.Free(id)
+	<-r.Context().Done()
 }
 
 func deserID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, err error) {

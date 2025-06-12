@@ -1,5 +1,8 @@
 {{ define "messages" }}
-  {{range .}}
-    <p><span>{{ .Role }}: </span>{{ .Text }}</p>
+  {{range .Messages}}
+    <p><span>{{.Role}}: </span>{{.Text}}</p>
   {{end}}
+  <div hx-ext="sse" sse-connect="{{.ID}}/assistant/message" sse-swap="message">
+    Streaming message
+  </div>
 {{end}}

@@ -51,19 +51,21 @@ func genTitle(ctx context.Context, g *genkit.Genkit, msg string) (string, error)
 	return resp.Text(), err
 }
 
-func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message) ([]Message, error) {
+func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, s chan<- string) error {
+	slog.Info("Starting message generation")
 	mapped := make([]*ai.Message, len(msgs))
 	for i, msg := range msgs {
 		mapped[i] = ai.NewTextMessage(ai.Role(msg.Role), msg.Text)
 	}
-	resp, err := genkit.Generate(ctx, g, ai.WithMessages(mapped...))
+	_, err := genkit.Generate(ctx, g,
+		ai.WithMessages(mapped...),
+		ai.WithStreaming(func(ctx context.Context, chunk *ai.ModelResponseChunk) error {
+			s <- chunk.Text()
+			return nil
+		}),
+	)
 	if err != nil {
-		return msgs, err
+		return err
 	}
-	msg := Message{
-		Text: resp.Text(),
-		Role: "assistant",
-	}
-	msgs = append(msgs, msg)
-	return msgs, nil
+	return nil
 }

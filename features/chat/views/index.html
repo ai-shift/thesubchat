@@ -11,7 +11,7 @@
 	<a href="/chat">Start a new chat</a>
       {{end}}
       <div id="messages">
-	{{template "messages" .Messages}}
+	{{template "messages" .}}
       </div>
       <form
 	hx-post="{{ .ID }}/user/message"
