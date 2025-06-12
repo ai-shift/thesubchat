@@ -17,6 +17,9 @@ sqlc-generate: format
 migrate-up:
 	geni up
 
+migrate-down:
+	geni down
+
 # make migrate-new NAME=<your migration name>
 migrate-new:
 	geni new $(NAME)
