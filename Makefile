@@ -11,12 +11,13 @@ lint: format
 	go vet ./...
 	staticcheck ./...
 
-sqlc-generate:
+sqlc-generate: format
 	sqlc generate
 
 migrate-up:
 	geni up
 
+# make migrate-new NAME=<your migration name>
 migrate-new:
 	geni new $(NAME)
 
