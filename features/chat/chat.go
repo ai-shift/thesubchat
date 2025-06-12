@@ -17,7 +17,6 @@ import (
 )
 
 type ChatHandler struct {
-	ctx       context.Context
 	templates *templates.Templates
 	llm       *llm.LLM
 	q         *db.Queries
@@ -150,7 +149,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("saving chat", "id", chat.ID)
-	err = h.q.SaveChat(h.ctx, db.SaveChatParams{
+	err = h.q.SaveChat(ctx, db.SaveChatParams{
 		ID:       chat.ID.String(),
 		Title:    chat.Title,
 		Messages: encoded,
