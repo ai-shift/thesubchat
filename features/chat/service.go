@@ -7,7 +7,7 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/google/uuid"
 	"log/slog"
-	"shellshift/internal/chat/llm"
+	"shellshift/features/chat/llm"
 	"shellshift/internal/db"
 )
 

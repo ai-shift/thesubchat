@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
-	"shellshift/internal/chat/llm"
+	"shellshift/features/chat/llm"
 	"shellshift/internal/db"
 	"shellshift/internal/templates"
 )
