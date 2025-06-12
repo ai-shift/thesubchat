@@ -5,3 +5,9 @@ CREATE TABLE IF NOT EXISTS chat (
     created_at INTEGER NOT NULL DEFAULT (unixepoch()),
     updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
+
+CREATE TABLE chat_tag (
+    chat_id text,
+    name text NOT NULL UNIQUE,
+    FOREIGN KEY (chat_id) REFERENCES chat (id)
+);
