@@ -129,8 +129,9 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
   // TODO: Add timeout
 	c := h.sc.Alloc(chat.ID)
 	msgContext := context.Background()
+  chat.Messages = append(chat.Messages, Message{Text: prompt, Role: "user"})
 	go func(ctx context.Context) {
-		err := generateMessage(ctx, h.g, append(chat.Messages, Message{Text: prompt, Role: "user"}), c)
+		err := generateMessage(ctx, h.g, chat.Messages, c)
 		if err != nil {
 			slog.Error("failed to generate message", "with", err)
 		}
