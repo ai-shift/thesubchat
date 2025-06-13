@@ -5,6 +5,9 @@
       <title>Shell>> graph</title>
       {{block "meta" .}}{{end}}
       <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.32.0/cytoscape.umd.js" integrity="sha512-GGjidh/YrEO6BuFD0mg4fDfTm3+acmGuNVLc3iiksLtihH5YYkOayWgZzoKJmPZCjTh4vPu5JO3aHV5ZJ9n9DQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+      <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+      <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+      <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
     </head>
     <body>
       <div id="graph" style="width:full;height:100dvh;"></div>
@@ -17,37 +20,76 @@
      var cy = cytoscape({
        container: document.getElementById('graph'),
        elements,
+       ready: function(){
+              this.nodes().forEach((node) => {
+                if (node.data().level === undefined) return;
+                let size = 20 - node.data().level * 5;
+                node.css("width", size);
+                node.css("height", size);
+              })
+       },
        layout: {
-         name: "concentric",
-         equidistant: true,
-                 concentric: (node) => 100 - node.data().level,
-         spacingFactor: 2,
-         animate: true,
-         animationDuration: 1000,
-
+         name: "fcose",
        },
        style: [
          {
            selector: 'node',
            style: {
              'background-color': '#666',
-             'label': 'data(title)',
            }
          },
          {
            selector: 'edge',
            style: {
-             'width': 3,
              'line-color': '#ccc',
+             'width': 3
            }
          }
+       ],style: [
+              {
+                selector: 'node',
+                style: {
+                  'background-color': '#2B65EC',
+                }
+              },
+
+              {
+              selector: ':parent',
+                style: {
+                  'background-opacity': 0.333,
+                  'border-color': '#2B65EC'
+                }
+              },
+
+              {
+                selector: 'edge',
+                style: {
+                  'line-color': '#2B65EC'
+                }
+              },
+
+              {
+                selector: 'node:selected',
+                style: {
+                  'background-color': '#F08080',
+                  'border-color': 'red'
+                }
+              },
+
+              {
+                selector: 'edge:selected',
+                style: {
+                  'line-color': '#F08080'
+                }
+              }
        ],
      });
 
      cy.on("tap", "node", (e) =>
        {
-         const node = e.target;
-       window.navigation.navigate(`{{.ChatURI}}/${node.id()}`)
+         const node = e.target
+         if (node.isParent()) return
+         window.navigation.navigate(`{{.ChatURI}}/${node.id()}`)
      });
     </script>
   </html>
