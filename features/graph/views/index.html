@@ -5,46 +5,44 @@
       <title>Shell>> graph</title>
       {{block "meta" .}}{{end}}
       <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.32.0/cytoscape.umd.js" integrity="sha512-GGjidh/YrEO6BuFD0mg4fDfTm3+acmGuNVLc3iiksLtihH5YYkOayWgZzoKJmPZCjTh4vPu5JO3aHV5ZJ9n9DQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-      <script src="https://unpkg.com/layout-base/layout-base.js"></script>
-      <script src="https://unpkg.com/cose-base/cose-base.js"></script>
-      <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
     </head>
     <body>
       <div id="graph" style="width:full;height:100dvh;"></div>
     </body>
     <script type="text/javascript">
      const elements = {{.Graph}}
+
        console.log(elements)
 
-       var cy = cytoscape({
-      container: document.getElementById('graph'),
-        elements,
-        style: [
-                 {
-                   selector: 'node',
-                   style: {
-                     'background-color': '#666',
-                     'label': 'data(id)'
-                   }
-                 },
-                 {
-                   selector: 'edge',
-                   style: {
-                     'width': 3,
-                     'line-color': '#ccc',
-                     'target-arrow-color': '#ccc',
-                     'curve-style': 'bezier'
-                   }
-                 }
-        ],
-        layout: {
-          name: 'fcose',
-          idealEdgeLength: edge => 150,
-        }
-       });
+     var cy = cytoscape({
+       container: document.getElementById('graph'),
+       elements,
+       layout: {
+         name: "concentric",
+         equidistant: true,
+                 concentric: (node) => 100 - node.data().level,
+         spacingFactor: 2,
+         animate: true,
+         animationDuration: 1000,
 
-     const lastUsed = cy.$id(elements[0].data.id)
-     cy.center(lastUsed)
+       },
+       style: [
+         {
+           selector: 'node',
+           style: {
+             'background-color': '#666',
+             'label': 'data(title)',
+           }
+         },
+         {
+           selector: 'edge',
+           style: {
+             'width': 3,
+             'line-color': '#ccc',
+           }
+         }
+       ],
+     });
 
      cy.on("tap", "node", (e) =>
        {
