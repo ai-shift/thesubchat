@@ -2,7 +2,6 @@ package graph
 
 import (
 	"cmp"
-	"fmt"
 	"shellshift/internal/db"
 	"slices"
 	"time"
@@ -82,24 +81,6 @@ func buildGraph(chats []db.GetGraphRow) []any {
 		node := graph[i].(Node)
 		node.Data.Level = dayDiff + 1
 		graph[i] = node
-	}
-
-
-	// Collect edges
-	for tag, ids := range m {
-		for i := range ids {
-			for j := i + 1; j < len(ids); j++ {
-				graph = append(graph, Edge{
-					Group: "edges",
-					Data: EdgeData{
-						ID:     fmt.Sprintf("%s:%s", ids[i], ids[j]),
-						Source: ids[i],
-						Target: ids[j],
-						Tag:    tag,
-					},
-				})
-			}
-		}
 	}
 
 	return graph
