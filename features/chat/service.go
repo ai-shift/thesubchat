@@ -39,6 +39,17 @@ func findChat(q *db.Queries, id uuid.UUID) (*Chat, error) {
 	}, nil
 }
 
+func findChatsTitles(q *db.Queries) ([]db.FindChatTitlesRow, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	chats, err := q.FindChatTitles(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return chats, nil
+}
+
 func genTitle(ctx context.Context, g *genkit.Genkit, msg string) (string, error) {
 	slog.Info("generating title chat")
 	resp, err := genkit.Generate(ctx, g,

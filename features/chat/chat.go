@@ -51,6 +51,11 @@ func InitMux(q *db.Queries) *http.ServeMux {
 	return m
 }
 
+type ChatViewData struct {
+	Chat       Chat
+	ChatTitles []db.FindChatTitlesRow
+}
+
 func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 	id, err := deserID(w, r)
 	if err != nil {
@@ -64,7 +69,16 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	err = h.templates.Render(w, "index", chat)
+	chatTitles, err := findChatsTitles(h.q)
+	if err != nil {
+		slog.Error("failed to find chat titles", "err", err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+  err = h.templates.Render(w, "index", ChatViewData{
+		Chat:       *chat,
+		ChatTitles: chatTitles,
+	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -73,8 +87,18 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
-	err := h.templates.Render(w, "index", Chat{
-		ID: uuid.New(),
+  chatTitles, err := findChatsTitles(h.q)
+	if err != nil {
+		slog.Error("failed to find chat titles", "err", err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+  err = h.templates.Render(w, "index", ChatViewData{
+    Chat: Chat{
+      ID: uuid.New(),
+    },
+    ChatTitles: chatTitles,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
