@@ -49,6 +49,42 @@ func (q *Queries) FindChat(ctx context.Context, id string) (FindChatRow, error) 
 	return i, err
 }
 
+const findChatTitles = `-- name: FindChatTitles :many
+SELECT
+    id,
+    title
+FROM
+    chat
+`
+
+type FindChatTitlesRow struct {
+	ID    string
+	Title string
+}
+
+func (q *Queries) FindChatTitles(ctx context.Context) ([]FindChatTitlesRow, error) {
+	rows, err := q.db.QueryContext(ctx, findChatTitles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FindChatTitlesRow
+	for rows.Next() {
+		var i FindChatTitlesRow
+		if err := rows.Scan(&i.ID, &i.Title); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const findTags = `-- name: FindTags :many
 SELECT
     name

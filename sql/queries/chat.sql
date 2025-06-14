@@ -7,6 +7,13 @@ FROM
 WHERE
     id = ?;
 
+-- name: FindChatTitles :many
+SELECT
+    id,
+    title
+FROM
+    chat;
+
 -- name: SaveChat :exec
 INSERT INTO
     chat (id, title, messages)
