@@ -70,7 +70,7 @@ func buildGraph(chats []db.GetGraphRow) []any {
 		}
 	}
 
-	// Set nodes level according to
+	// Set nodes level according to their last updated date
 	slices.SortFunc(graph, func(a, b any) int {
 		return cmp.Compare(b.(Node).Data.UpdatedAt, a.(Node).Data.UpdatedAt)
 	})
