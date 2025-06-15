@@ -37,25 +37,26 @@
       <form
         id="prompt"
         hx-post="{{ .Chat.ID }}/message"
+        hx-vals='js:{
+            "prompt": editor.getValue(),
+            "mentions": JSON.stringify(mentionedChats.map(mention => mention.chat))
+            }'
         hx-target="#messages"
-        hx-on::after-request="if(event.detail.successful) this.reset()"
-        class="flex items-center justify-center bg-gray-400 p-4"
+        hx-on::after-request="
+            if(event.detail.successful) this.reset()
+            editor.setValue()"
+        class="flex items-center justify-center bg-gray-400 p-4 pb-10"
       >
-      <div class="relative">
-        <div id="editor" style="height: 500px; width: 800px"></div>
-        <div
-            id="commandline"
-            style="position: absolute; bottom: 10px; height: 20px; width: 800px"
-        ></div>
-        <button type="submit">Send</button>
+      <div class="flex h-64 w-96">
+        <div id="editor" class="h-full w-full relative"></div>
+        <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
       </div>
       </form>
     </body>
     <script>
      const chatTitlesIds = {{.ChatTitles}}
-     let mentionedChats = []
+       let mentionedChats = []
 
-     var langTools = ace.require('ace/ext/language_tools');
      var editor = ace.edit('editor');
      var Range = ace.require('ace/range').Range;
 
@@ -148,11 +149,6 @@
        return event
      })
 
-     document.body.addEventListener('htmx:configRequest', function(evt) {
-       evt.detail.parameters['prompt'] = editor.getValue();
-       editor.setValue("")
-     });
-
      function rangesIntersect(rangeA, rangeB) {
        function posIsBefore(p1, p2) {
          return p1.row < p2.row || (p1.row === p2.row && p1.column < p2.column);
@@ -175,7 +171,6 @@
      function rangesAreEqual(rangeA, rangeB) {
        return JSON.stringify(rangeA) === JSON.stringify(rangeB)
      }
-
 
     </script>
   </html>
