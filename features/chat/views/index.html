@@ -53,7 +53,7 @@
     </body>
     <script>
      const chatTitlesIds = {{.ChatTitles}}
-     const mentionedChats = []
+     let mentionedChats = []
 
      var langTools = ace.require('ace/ext/language_tools');
      var editor = ace.edit('editor');
@@ -132,16 +132,16 @@
      editor.on("change", (event) => {
        const eventRange = {start: event.start, end: event.end}
 
-			 for (let i = 0; i < mentionedChats.length; i++) {
-				 let chat = mentionedChats[i]
+       for (let i = 0; i < mentionedChats.length; i++) {
+	 let chat = mentionedChats[i]
          if (rangesAreEqual(chat.range, eventRange) || !rangesIntersect(chat.range, eventRange)) {
-					 continue
+	   continue
          }
-				 editor.getSession().removeMarker(chat.marker)
-				 editor.getSession().replace(chat.range, "")
-				 mentionedChats = mentionedChats.splice(i, 1)
-				 break
-			 }
+	 editor.getSession().removeMarker(chat.marker)
+	 editor.getSession().replace(chat.range, "")
+	 mentionedChats = mentionedChats.splice(i, 1)
+	 break
+       }
 
        return event
      })
