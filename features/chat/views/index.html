@@ -133,14 +133,14 @@
        const eventRange = {start: event.start, end: event.end}
 
        for (let i = 0; i < mentionedChats.length; i++) {
-	 let chat = mentionedChats[i]
+         let chat = mentionedChats[i]
          if (rangesAreEqual(chat.range, eventRange) || !rangesIntersect(chat.range, eventRange)) {
-	   continue
+           continue
          }
-	 editor.getSession().removeMarker(chat.marker)
-	 editor.getSession().replace(chat.range, "")
-	 mentionedChats = mentionedChats.splice(i, 1)
-	 break
+         editor.getSession().removeMarker(chat.marker)
+         editor.getSession().replace(chat.range, "")
+         mentionedChats.splice(i, 1)
+         break
        }
 
        return event
