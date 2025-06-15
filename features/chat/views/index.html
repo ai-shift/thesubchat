@@ -23,32 +23,32 @@
     </head>
     <body class="flex flex-col flex-grow h-screen">
       <header class="flex justify-between items-center bg-gray-200">
-	{{if .Chat.Title}}
-	  <h1>{{.Chat.Title}}</h1>
-	  <div hx-get="{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
-	{{else}}
-	  <h1>New chat</h1>
-	{{end}}
-	{{if .Chat.Messages}}
-	  <a href="/chat" class="bg-blue-300 p-2">Start a new chat</a>
-	{{end}}
+        {{if .Chat.Title}}
+          <h1>{{.Chat.Title}}</h1>
+          <div hx-get="{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
+        {{else}}
+          <h1>New chat</h1>
+        {{end}}
+        {{if .Chat.Messages}}
+          <a href="/chat" class="bg-blue-300 p-2">Start a new chat</a>
+        {{end}}
       </header>
       {{template "messages" .Chat}}
       <form
         id="prompt"
-	hx-post="{{ .Chat.ID }}/message"
-	hx-target="#messages"
-	hx-on::after-request="if(event.detail.successful) this.reset()"
-	class="flex items-center justify-center bg-gray-400 p-4"
+        hx-post="{{ .Chat.ID }}/message"
+        hx-target="#messages"
+        hx-on::after-request="if(event.detail.successful) this.reset()"
+        class="flex items-center justify-center bg-gray-400 p-4"
       >
-	  <div class="relative">
-              <div id="editor" style="height: 500px; width: 800px"></div>
-              <div
-                id="commandline"
-                style="position: absolute; bottom: 10px; height: 20px; width: 800px"
-              ></div>
-              <button type="submit">Send</button>
-	  </div>
+      <div class="relative">
+        <div id="editor" style="height: 500px; width: 800px"></div>
+        <div
+            id="commandline"
+            style="position: absolute; bottom: 10px; height: 20px; width: 800px"
+        ></div>
+        <button type="submit">Send</button>
+      </div>
       </form>
     </body>
     <script>
