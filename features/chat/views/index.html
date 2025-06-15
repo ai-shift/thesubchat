@@ -91,7 +91,9 @@
          }
 
 
-         wordList = chatTitlesIds
+         wordList = chatTitlesIds.filter(chat => {
+           return !mentionedChats.find(mentioned => mentioned.chat.ID === chat.ID)
+         })
          callback(
            null,
            wordList.map(function (ea) {
