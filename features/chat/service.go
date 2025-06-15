@@ -21,18 +21,18 @@ type Message struct {
 	Role string
 }
 
-func findChat(q *db.Queries, id uuid.UUID) (*Chat, error) {
+func findChat(q *db.Queries, id uuid.UUID) (Chat, error) {
 	ctx := context.Background()
 	chat, err := q.FindChat(ctx, id.String())
 	if err != nil {
-		return nil, err
+		return Chat{}, err
 	}
 	var msgs []Message
 	err = json.Unmarshal(chat.Messages, &msgs)
 	if err != nil {
-		return nil, err
+		return Chat{}, err
 	}
-	return &Chat{
+	return Chat{
 		ID:       id,
 		Title:    chat.Title,
 		Messages: msgs,
@@ -82,12 +82,20 @@ func saveChat(ctx context.Context, q *db.Queries, c Chat) error {
 
 }
 
-func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, s chan<- string) (msg Message, err error) {
+func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, mentioned []Chat, s chan<- string) (msg Message, err error) {
 	slog.Info("Starting message generation")
 	mapped := make([]*ai.Message, len(msgs))
 	for i, msg := range msgs {
 		mapped[i] = ai.NewTextMessage(ai.Role(msg.Role), msg.Text)
 	}
+  mentionedBlob, err := json.Marshal(mentioned)
+  if err != nil {
+    return
+  }
+  mapped = append(mapped, &ai.Message{
+    Content: []*ai.Part{ ai.NewJSONPart(string(mentionedBlob))},
+  },
+  )
 	resp, err := genkit.Generate(ctx, g,
 		ai.WithMessages(mapped...),
 		ai.WithStreaming(func(ctx context.Context, chunk *ai.ModelResponseChunk) error {
