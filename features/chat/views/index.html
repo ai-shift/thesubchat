@@ -131,15 +131,18 @@
      // Track changes in mentions ranges
      editor.on("change", (event) => {
        const eventRange = {start: event.start, end: event.end}
-       console.log("event range", eventRange)
 
-       mentionedChats.forEach((chat, i) => {
-         if (!rangesAreEqual(chat.range, eventRange) && rangesIntersect(chat.range, eventRange)) {
-           console.log("marker", chat.marker)
-           editor.getSession().removeMarker(chat.marker)
-           editor.getSession().replace(chat.range, "")
+			 for (let i = 0; i < mentionedChats.length; i++) {
+				 let chat = mentionedChats[i]
+         if (rangesAreEqual(chat.range, eventRange) || !rangesIntersect(chat.range, eventRange)) {
+					 continue
          }
-       })
+				 editor.getSession().removeMarker(chat.marker)
+				 editor.getSession().replace(chat.range, "")
+				 mentionedChats = mentionedChats.splice(i, 1)
+				 break
+			 }
+
        return event
      })
 
