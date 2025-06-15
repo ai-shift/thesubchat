@@ -5,10 +5,8 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
-	"github.com/firebase/genkit/go/genkit"
-	"github.com/firebase/genkit/go/plugins/googlegenai"
-	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 	"shellshift/features/chat/schats"
@@ -16,6 +14,10 @@ import (
 	"shellshift/internal/sse"
 	"shellshift/internal/templates"
 	"strings"
+
+	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/googlegenai"
+	"github.com/google/uuid"
 )
 
 type ChatHandler struct {
@@ -76,7 +78,7 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err = h.templates.Render(w, "index", ChatViewData{
-		Chat:       *chat,
+		Chat:       chat,
 		ChatTitles: chatTitles,
 	})
 	if err != nil {
@@ -107,13 +109,29 @@ func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type ChatMention struct {
+  ID uuid.UUID
+  Title string
+}
+
 func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	// Validate request
 	prompt := r.FormValue("prompt")
+
 	if prompt == "" {
 		http.Error(w, "Prompt shouldn't be empty", http.StatusBadRequest)
 		return
 	}
+
+  mentionsJSON := r.FormValue("mentions")
+  mentions := []ChatMention{}
+
+  err := json.Unmarshal([]byte(mentionsJSON), &mentions)
+  if err != nil {
+    http.Error(w, err.Error(), http.StatusBadRequest)
+    return
+  }
+
 	id, err := deserID(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -132,7 +150,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		break
 	case sql.ErrNoRows:
 		waitTitle = true
-		chat = &Chat{
+		chat = Chat{
 			ID:       id,
 			Messages: make([]Message, 0),
 		}
@@ -150,20 +168,32 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+  mentionedChats := make([]Chat, len(mentions))
+
+  for i,v := range mentions {
+    chat, err := findChat(h.q, v.ID)
+    if err != nil {
+      slog.Error("failed to find mentioned chat", "err", err)
+      http.Error(w, err.Error(), http.StatusInternalServerError)
+      return
+    }
+    mentionedChats[i] = chat
+  }
+
 	chat.Messages = append(chat.Messages, Message{Text: prompt, Role: "user"})
 
 	// Eval prompt
 	// TODO: Add timeout
 	stream := h.sc.Alloc(chat.ID)
-	go func(ctx context.Context, chat *Chat) {
-		msg, err := generateMessage(ctx, h.g, chat.Messages, stream.Chunks)
+	go func(ctx context.Context, chat Chat) {
+		msg, err := generateMessage(ctx, h.g, chat.Messages, mentionedChats, stream.Chunks)
 		close(stream.Chunks)
 		if err != nil {
 			slog.Error("failed to generate message", "with", err)
 			return
 		}
 		chat.Messages = append(chat.Messages, msg)
-		saveChat(ctx, h.q, *chat)
+		saveChat(ctx, h.q, chat)
 		stream.Done <- struct{}{}
 		slog.Error("message generation was finished")
 	}(context.Background(), chat)
@@ -175,7 +205,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			slog.Info("title generated")
 			chat.Title = title
 			// TODO: Save only title
-			saveChat(r.Context(), h.q, *chat)
+			saveChat(r.Context(), h.q, chat)
 			slog.Info("Chat saved")
 		case err := <-errChan:
 			slog.Error("failed to generate title", "with", err.Error())
