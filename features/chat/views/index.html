@@ -4,10 +4,20 @@
     <head>
       <title>Shell>> chat</title>
       {{block "meta" .}}{{end}}
+      <script
+        src="https://rawgithub.com/ajaxorg/ace-builds/master/src/ace.js"
+        type="text/javascript"
+        charset="utf-8"
+      ></script>
+      <script
+        src="https://rawgithub.com/ajaxorg/ace-builds/master/src/ext-language_tools.js"
+        type="text/javascript"
+        charset="utf-8"
+      ></script>
       <style>
-       .option {
-           padding: 1rem 2rem;
-           color: #2f3236;
+       .active {
+           background: #ed7eeb;
+           position: absolute;
        }
       </style>
     </head>
@@ -25,18 +35,143 @@
       </header>
       {{template "messages" .Chat}}
       <form
+        id="prompt"
 	hx-post="{{ .Chat.ID }}/message"
 	hx-target="#messages"
 	hx-on::after-request="if(event.detail.successful) this.reset()"
 	class="flex items-center justify-center bg-gray-400 p-4"
       >
-	<div class="relative">
-	    <textarea class="h-30 w-96 bg-white p-2"  id="prompt" name="prompt" type="text" required placeholder="Prompt..."></textarea>
-            <button type="submit">Send</button>
-	</div>
+	  <div class="relative">
+              <div id="editor" style="height: 500px; width: 800px"></div>
+              <div
+                id="commandline"
+                style="position: absolute; bottom: 10px; height: 20px; width: 800px"
+              ></div>
+              <button type="submit">Send</button>
+	  </div>
       </form>
     </body>
     <script>
+     const chatTitlesIds = {{.ChatTitles}}
+     const mentionedChats = []
+
+     var langTools = ace.require('ace/ext/language_tools');
+     var editor = ace.edit('editor');
+     var Range = ace.require('ace/range').Range;
+
+     editor.setOptions({
+       enableBasicAutocompletion: true,
+       behavioursEnabled: true,
+       enableLiveAutocompletion: true,
+       showGutter: false,
+       printMargin: false,
+     });
+
+     var mentionCompleter = {
+       identifierRegexps: [/^@.*/],
+       onInsert: (editor, completion) => {console.log(completion)},
+       getCompletions: function (editor, session, pos, prefix, callback) {
+         if (!prefix.startsWith("@")) {
+           return callback(null, [])
+         }
+
+         if (pos.column > 0) {
+           const symbolBeforeAt = editor.session.getTextRange({
+             start: {
+               ...pos,
+               column: pos.column - 2
+             },
+             end: {
+               ...pos,
+               column: pos.column - 1
+             }
+           });
+
+           if (!/^(\t|\s)+/.test(symbolBeforeAt) && pos.column > 1) return callback(null, [])
+         }
+
+
+         wordList = chatTitlesIds
+         callback(
+           null,
+           wordList.map(function (ea) {
+             return {
+               name: ea.Title,
+               value: "@" + ea.Title,
+               meta: 'mention',
+             };
+           })
+         );
+       },
+     };
+
+     editor.completers = [mentionCompleter]
+
+     // Set mark on mention and push chat to mentionedChats
+     editor.on("change", (event) => {
+       if (event.action !== "insert") return event
+       if (!event.lines[0].startsWith("@")) return event
+
+       const chatTitle = event.lines[0].slice(1);
+       const chat = chatTitlesIds.find( chat => chat.Title.startsWith(chatTitle) && chatTitle != "")
+       if (!chat) return event
+
+       const range = new Range(event.start.row, event.start.column, event.end.row, event.end.column)
+       const marker = editor.getSession().addMarker(range,"active", "text");
+       if (!marker) return event
+
+       mentionedChats.push({
+         chat,
+         marker,
+         range
+       })
+       return event
+     });
+
+     // Track changes in mentions ranges
+     editor.on("change", (event) => {
+       const eventRange = {start: event.start, end: event.end}
+       console.log("event range", eventRange)
+
+       mentionedChats.forEach((chat, i) => {
+         if (!rangesAreEqual(chat.range, eventRange) && rangesIntersect(chat.range, eventRange)) {
+           console.log("marker", chat.marker)
+           editor.getSession().removeMarker(chat.marker)
+           editor.getSession().replace(chat.range, "")
+         }
+       })
+       return event
+     })
+
+     document.body.addEventListener('htmx:configRequest', function(evt) {
+       evt.detail.parameters['prompt'] = editor.getValue();
+       editor.setValue("")
+     });
+
+     function rangesIntersect(rangeA, rangeB) {
+       function posIsBefore(p1, p2) {
+         return p1.row < p2.row || (p1.row === p2.row && p1.column < p2.column);
+       }
+       function posIsAfter(p1, p2) {
+         return p1.row > p2.row || (p1.row === p2.row && p1.column > p2.column);
+       }
+       function posIsEqual(p1, p2) {
+         return p1.row === p2.row && p1.column === p2.column;
+       }
+       if (posIsBefore(rangeA.end, rangeB.start) || posIsEqual(rangeA.end, rangeB.start)) {
+         return false;
+       }
+       if (posIsAfter(rangeA.start, rangeB.end) || posIsEqual(rangeA.start, rangeB.end)) {
+         return false;
+       }
+       return true;
+     }
+
+     function rangesAreEqual(rangeA, rangeB) {
+       return JSON.stringify(rangeA) === JSON.stringify(rangeB)
+     }
+
+
     </script>
   </html>
 {{ end }}

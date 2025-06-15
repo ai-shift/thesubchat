@@ -45,11 +45,11 @@ func buildGraph(chats []db.GetGraphRow) []any {
 			})
 		}
 
-    if !v.Name.Valid{
-      continue
-    }
+		if !v.Name.Valid {
+			continue
+		}
 		// Build [tag]:[]ids map
-    tag := v.Name.String
+		tag := v.Name.String
 
 		if s, ok := m[tag]; !ok {
 			m[tag] = []string{v.ID}
