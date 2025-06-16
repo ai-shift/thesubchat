@@ -5,8 +5,10 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+
 	"shellshift/internal/db"
 	"shellshift/internal/templates"
+	"shellshift/web"
 )
 
 type GraphHandler struct {
@@ -28,8 +30,9 @@ func InitMux(q *db.Queries, chatURI string) *http.ServeMux {
 }
 
 type Graph struct {
-	ChatURI string
-	Graph   []any
+	ChatURI  string
+	Graph    []any
+	Keybinds web.KeybindsTable
 }
 
 func (h GraphHandler) getGraph(w http.ResponseWriter, r *http.Request) {
@@ -44,8 +47,9 @@ func (h GraphHandler) getGraph(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.t.Render(w, "index", Graph{
-		ChatURI: h.chatURI,
-		Graph:   buildGraph(chats),
+		ChatURI:  h.chatURI,
+		Graph:    buildGraph(chats),
+		Keybinds: web.Keybinds,
 	})
 
 	if err != nil {
