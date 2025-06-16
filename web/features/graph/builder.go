@@ -43,6 +43,9 @@ type EdgeData struct {
 }
 
 func buildGraph(chats []db.GetGraphRow) []any {
+	if len(chats) == 0 {
+		return []any{}
+	}
 	var graph []any
 	tagGroups := groupTags(chats)
 
