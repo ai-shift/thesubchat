@@ -4,11 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
+	"log/slog"
+	"shellshift/internal/db"
+
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/google/uuid"
-	"log/slog"
-	"shellshift/internal/db"
+
+	"github.com/gomarkdown/markdown"
+	"github.com/gomarkdown/markdown/html"
+	"github.com/gomarkdown/markdown/parser"
 )
 
 type Chat struct {
@@ -133,4 +139,35 @@ func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, ment
 	msg.Role = "model"
 	msg.Text = resp.Text()
 	return
+}
+
+func markdownToHTML(markdownStr string) string {
+	extentions := parser.CommonExtensions | parser.MathJax | parser.SuperSubscript | parser.AutoHeadingIDs
+
+	p := parser.NewWithExtensions(extentions)
+	doc := p.Parse([]byte(markdownStr))
+
+	htmlFlags := html.CommonFlags
+	opts := html.RendererOptions{Flags: htmlFlags}
+	renderer := html.NewRenderer(opts)
+
+	return string(markdown.Render(doc, renderer))
+}
+
+type HTMLMessage struct {
+	Role string
+	Text template.HTML
+}
+
+func renderMessages(chat Chat) []HTMLMessage {
+	htmlMessages := make([]HTMLMessage, len(chat.Messages))
+
+	for i, v := range chat.Messages {
+		htmlMessages[i] = HTMLMessage{
+			Role: v.Role,
+			Text: template.HTML(markdownToHTML(v.Text)),
+		}
+	}
+
+	return htmlMessages
 }

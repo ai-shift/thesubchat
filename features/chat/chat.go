@@ -53,8 +53,14 @@ func InitMux(q *db.Queries) *http.ServeMux {
 	return m
 }
 
+type ChatRender struct {
+	ID       uuid.UUID
+	Title    string
+	Messages []HTMLMessage
+}
+
 type ChatViewData struct {
-	Chat       Chat
+	Chat       ChatRender
 	ChatTitles []db.FindChatTitlesRow
 }
 
@@ -78,7 +84,11 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err = h.templates.Render(w, "index", ChatViewData{
-		Chat:       chat,
+		Chat: ChatRender{
+			ID:       chat.ID,
+			Title:    chat.Title,
+			Messages: renderMessages(chat),
+		},
 		ChatTitles: chatTitles,
 	})
 	if err != nil {
@@ -97,7 +107,7 @@ func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.templates.Render(w, "index", ChatViewData{
-		Chat: Chat{
+		Chat: ChatRender{
 			ID: uuid.New(),
 		},
 		ChatTitles: chatTitles,
