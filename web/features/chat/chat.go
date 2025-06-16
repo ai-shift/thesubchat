@@ -27,9 +27,11 @@ type ChatHandler struct {
 	q         *db.Queries
 	g         *genkit.Genkit
 	sc        *schats.StreamedChats
+	baseURI   string
+	graphURI  string
 }
 
-func InitMux(q *db.Queries) *http.ServeMux {
+func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 	ctx := context.Background()
 	g, err := genkit.Init(ctx,
 		genkit.WithPlugins(&googlegenai.GoogleAI{}),
@@ -43,6 +45,8 @@ func InitMux(q *db.Queries) *http.ServeMux {
 		q:         q,
 		g:         g,
 		sc:        schats.New(),
+		baseURI:   baseURI,
+		graphURI:  graphURI,
 	}
 	m := http.NewServeMux()
 	m.HandleFunc("GET /{id}", h.getChat)
@@ -65,6 +69,8 @@ type ChatViewData struct {
 	Chat       ChatRender
 	ChatTitles []db.FindChatTitlesRow
 	Keybinds   web.KeybindsTable
+	BaseURI    string
+	GraphURI   string
 }
 
 func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
@@ -94,6 +100,8 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		},
 		ChatTitles: chatTitles,
 		Keybinds:   web.Keybinds,
+		BaseURI:    h.baseURI,
+		GraphURI:   h.graphURI,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
@@ -116,6 +124,8 @@ func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 		},
 		ChatTitles: chatTitles,
 		Keybinds:   web.Keybinds,
+		BaseURI:    h.baseURI,
+		GraphURI:   h.graphURI,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
