@@ -277,8 +277,10 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 		Role: "model",
 	}
 
+	var raw string
 	for chunk := range stream.Chunks {
-		msg.Text += markdownToHTML(chunk)
+		raw += chunk
+		msg.Text = markdownToHTML(raw)
 		var tpl bytes.Buffer
 		if err := h.templates.Render(&tpl, "message", msg); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
