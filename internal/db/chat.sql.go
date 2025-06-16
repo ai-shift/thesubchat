@@ -140,6 +140,25 @@ func (q *Queries) SaveChat(ctx context.Context, arg SaveChatParams) error {
 	return err
 }
 
+const saveChatTitle = `-- name: SaveChatTitle :exec
+UPDATE
+    chat
+SET
+    title = ?
+WHERE
+    id = ?
+`
+
+type SaveChatTitleParams struct {
+	Title string
+	ID    string
+}
+
+func (q *Queries) SaveChatTitle(ctx context.Context, arg SaveChatTitleParams) error {
+	_, err := q.db.ExecContext(ctx, saveChatTitle, arg.Title, arg.ID)
+	return err
+}
+
 const saveTag = `-- name: SaveTag :exec
 INSERT INTO
     chat_tag (chat_id, name)
@@ -154,5 +173,24 @@ type SaveTagParams struct {
 
 func (q *Queries) SaveTag(ctx context.Context, arg SaveTagParams) error {
 	_, err := q.db.ExecContext(ctx, saveTag, arg.ChatID, arg.Name)
+	return err
+}
+
+const updateChatMessages = `-- name: UpdateChatMessages :exec
+UPDATE
+    chat
+SET
+    messages = ?
+WHERE
+    id = ?
+`
+
+type UpdateChatMessagesParams struct {
+	Messages []byte
+	ID       string
+}
+
+func (q *Queries) UpdateChatMessages(ctx context.Context, arg UpdateChatMessagesParams) error {
+	_, err := q.db.ExecContext(ctx, updateChatMessages, arg.Messages, arg.ID)
 	return err
 }

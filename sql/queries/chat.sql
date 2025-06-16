@@ -45,3 +45,19 @@ DELETE FROM
 WHERE
     chat_id = ?
     AND name = ?;
+
+-- name: SaveChatTitle :exec
+UPDATE
+    chat
+SET
+    title = ?
+WHERE
+    id = ?;
+
+-- name: UpdateChatMessages :exec
+UPDATE
+    chat
+SET
+    messages = ?
+WHERE
+    id = ?;
