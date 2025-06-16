@@ -11,22 +11,25 @@
     </head>
     <body>
       <div id="graph" style="width:full;height:100dvh;"></div>
+      <a hx-trigger="keyup[key=='g'] from:body" hx-on::trigger='window.location=chatPath'></a>
+      <a hx-trigger="keyup[key=='n'] from:body" hx-on::trigger='window.location="/chat"'></a>
     </body>
     <script type="text/javascript">
      const elements = {{.Graph}}
 
-       console.log(elements)
+     const searchChatId = new URLSearchParams(window.location.search).get("fromChat")
+     const chatPath = `/chat/${searchChatId}`
 
      var cy = cytoscape({
        container: document.getElementById('graph'),
        elements,
        ready: function(){
-              this.nodes().forEach((node) => {
-                if (node.data().level === undefined) return;
-                let size = 30 - node.data().level * 3;
-                node.css("width", size);
-                node.css("height", size);
-              })
+         this.nodes().forEach((node) => {
+           if (node.data().level === undefined) return
+           let size = 30 - node.data().level * 3;
+           node.css("width", size);
+           node.css("height", size);
+         })
        },
        layout: {
          name: "fcose",
@@ -46,42 +49,42 @@
            }
          }
        ],style: [
-              {
-                selector: 'node',
-                style: {
-                  'background-color': '#2B65EC',
-                }
-              },
+         {
+           selector: 'node',
+           style: {
+             'background-color': '#2B65EC',
+           }
+         },
 
-              {
-              selector: ':parent',
-                style: {
-                  'background-opacity': 0.333,
-                  'border-color': '#2B65EC'
-                }
-              },
+         {
+           selector: ':parent',
+           style: {
+             'background-opacity': 0.333,
+             'border-color': '#2B65EC'
+           }
+         },
 
-              {
-                selector: 'edge',
-                style: {
-                  'line-color': '#2B65EC'
-                }
-              },
+         {
+           selector: 'edge',
+           style: {
+             'line-color': '#2B65EC'
+           }
+         },
 
-              {
-                selector: 'node:selected',
-                style: {
-                  'background-color': '#F08080',
-                  'border-color': 'red'
-                }
-              },
+         {
+           selector: 'node:selected',
+           style: {
+             'background-color': '#F08080',
+             'border-color': 'red'
+           }
+         },
 
-              {
-                selector: 'edge:selected',
-                style: {
-                  'line-color': '#F08080'
-                }
-              }
+         {
+           selector: 'edge:selected',
+           style: {
+             'line-color': '#F08080'
+           }
+         }
        ],
      });
 
@@ -89,7 +92,7 @@
        {
          const node = e.target
          if (node.isParent()) return
-         window.navigation.navigate(`{{.ChatURI}}/${node.id()}`)
+         window.location = `{{.ChatURI}}/${node.id()}`
      });
     </script>
   </html>
