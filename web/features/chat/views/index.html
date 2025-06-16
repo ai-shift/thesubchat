@@ -23,7 +23,7 @@
     </head>
     <body class="flex flex-col flex-grow h-screen">
       <header class="flex justify-between items-center bg-gray-200">
-        <a hx-trigger="click, {{.Keybinds.ToggleGraph}} from:body"
+        <a hx-trigger="click, {{.Keybinds.ToggleGraph.Value}} from:body"
            hx-on::trigger='window.location="{{.GraphURI}}?fromChat={{.Chat.ID}}"'
            >
            Graph
@@ -38,7 +38,7 @@
           <a
               href="{{.ChatURI}}"
               class="bg-blue-300 p-2"
-              hx-trigger="{{.Keybinds.NewChat}} from:body"
+              hx-trigger="{{.Keybinds.NewChat.Value}} from:body"
               hx-on::trigger='window.location="{{.ChatURI}}"'
               >
               Start a new chat
@@ -49,7 +49,7 @@
       <form
         id="prompt"
         hx-post="{{ .Chat.ID }}/message"
-        hx-trigger="{{.Keybinds.SendMessage}}"
+        hx-trigger="{{.Keybinds.SendMessage.Value}}"
         hx-vals='js:{
             "prompt": editor.getValue(),
             "mentions": JSON.stringify(mentionedChats.map(mention => mention.chat))
@@ -61,7 +61,7 @@
         class="flex items-center justify-center bg-gray-400 p-4 pb-10"
       >
       <div class="flex h-64 w-96">
-        <div hx-trigger="{{.Keybinds.ToggleGraph}} consume" id="editor" class="h-full w-full relative"></div>
+        <div hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume" id="editor" class="h-full w-full relative"></div>
         <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
       </div>
       </form>
