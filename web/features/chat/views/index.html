@@ -67,7 +67,7 @@
       </form>
     </body>
     <script>
-     const chatTitlesIds = {{.ChatTitles}}.filter(chat => chat.ID !== {{.Chat.ID}})
+     const chatTitlesIds = ({{.ChatTitles}} ?? []).filter(chat => chat.ID !== {{.Chat.ID}})
      let mentionedChats = []
 
      var editor = ace.edit('editor');
