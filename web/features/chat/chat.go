@@ -210,14 +210,14 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-    err = h.q.SaveMention(r.Context(), db.SaveMentionParams{
-      TargetID: v.ID.String(),
-      SourceID: chat.ID.String(),
-    })
-    if err != nil {
-      slog.Error("failed to save a mention", "with", err)
-      http.Error(w, err.Error(), http.StatusInternalServerError)
-    }
+		err = h.q.SaveMention(r.Context(), db.SaveMentionParams{
+			TargetID: v.ID.String(),
+			SourceID: chat.ID.String(),
+		})
+		if err != nil {
+			slog.Error("failed to save a mention", "with", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 
 		mentionedChats[i] = m
 	}
