@@ -41,7 +41,7 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 		panic(fmt.Sprintf("could not initialize Genkit: %v", err))
 	}
 	h := ChatHandler{
-		templates: templates.New("features/chat/views/*.html"),
+		templates: templates.New("web/features/chat/views/*.html"),
 		q:         q,
 		g:         g,
 		sc:        schats.New(),

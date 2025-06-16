@@ -20,7 +20,7 @@ type GraphHandler struct {
 func InitMux(q *db.Queries, chatURI string) *http.ServeMux {
 	h := GraphHandler{
 		chatURI: chatURI,
-		t:       templates.New("features/graph/views/*.html"),
+		t:       templates.New("web/features/graph/views/*.html"),
 		q:       q,
 	}
 
