@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"shellshift/features/chat/schats"
 	"shellshift/internal/db"
 	"shellshift/internal/sse"
 	"shellshift/internal/templates"
+	"shellshift/web/features/chat/schats"
 	"strings"
 
 	"github.com/firebase/genkit/go/genkit"
