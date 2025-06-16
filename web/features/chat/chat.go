@@ -18,6 +18,8 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/google/uuid"
+
+	"shellshift/web"
 )
 
 type ChatHandler struct {
@@ -62,6 +64,7 @@ type ChatRender struct {
 type ChatViewData struct {
 	Chat       ChatRender
 	ChatTitles []db.FindChatTitlesRow
+	Keybinds   web.KeybindsTable
 }
 
 func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
@@ -90,6 +93,7 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 			Messages: renderMessages(chat),
 		},
 		ChatTitles: chatTitles,
+		Keybinds:   web.Keybinds,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
@@ -111,6 +115,7 @@ func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 			ID: uuid.New(),
 		},
 		ChatTitles: chatTitles,
+		Keybinds:   web.Keybinds,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())

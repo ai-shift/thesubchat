@@ -23,25 +23,33 @@
     </head>
     <body class="flex flex-col flex-grow h-screen">
       <header class="flex justify-between items-center bg-gray-200">
-          <a hx-trigger="click, keyup[key=='g'] from:body"
-             hx-on::trigger='window.location="{{.GraphURI}}?fromChat={{.Chat.ID}}"'
-          >Graph</a>
-          <a hx-trigger="keyup[key=='n'] from:body" hx-on::trigger='window.location="{{.ChatURI}}"'></a>
-          {{if .Chat.Title}}
+        <a hx-trigger="click, {{.Keybinds.ToggleGraph}} from:body"
+           hx-on::trigger='window.location="{{.GraphURI}}?fromChat={{.Chat.ID}}"'
+           >
+           Graph
+        </a>
+        {{if .Chat.Title}}
           <h1>{{.Chat.Title}}</h1>
           <div hx-get="{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
         {{else}}
           <h1>New chat</h1>
         {{end}}
         {{if .Chat.Messages}}
-          <a href="/chat" class="bg-blue-300 p-2">Start a new chat</a>
+          <a
+              href="{{.ChatURI}}"
+              class="bg-blue-300 p-2"
+              hx-trigger="{{.Keybinds.NewChat}} from:body"
+              hx-on::trigger='window.location="{{.ChatURI}}"'
+              >
+              Start a new chat
+          </a>
         {{end}}
       </header>
       {{template "messages" .Chat}}
       <form
         id="prompt"
         hx-post="{{ .Chat.ID }}/message"
-        hx-trigger="keydown[ctrlKey&&key=='Enter']"
+        hx-trigger="{{.Keybinds.SendMessage}}"
         hx-vals='js:{
             "prompt": editor.getValue(),
             "mentions": JSON.stringify(mentionedChats.map(mention => mention.chat))
@@ -53,7 +61,7 @@
         class="flex items-center justify-center bg-gray-400 p-4 pb-10"
       >
       <div class="flex h-64 w-96">
-        <div hx-trigger="keyup[key=='g'] consume" id="editor" class="h-full w-full relative"></div>
+        <div hx-trigger="{{.Keybinds.ToggleGraph}} consume" id="editor" class="h-full w-full relative"></div>
         <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
       </div>
       </form>
