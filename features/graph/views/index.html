@@ -23,7 +23,7 @@
        ready: function(){
               this.nodes().forEach((node) => {
                 if (node.data().level === undefined) return;
-                let size = 20 - node.data().level * 5;
+                let size = 30 - node.data().level * 3;
                 node.css("width", size);
                 node.css("height", size);
               })

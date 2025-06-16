@@ -58,6 +58,7 @@ func buildGraph(chats []db.GetGraphRow) []any {
 					parent = strings.Join(tg.Tags, "-")
 				}
 			}
+
 			graph = append(graph, Node{
 				Group: "nodes",
 				Data: NodeData{
