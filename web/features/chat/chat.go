@@ -18,6 +18,8 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/google/uuid"
+
+	"shellshift/web"
 )
 
 type ChatHandler struct {
@@ -25,9 +27,11 @@ type ChatHandler struct {
 	q         *db.Queries
 	g         *genkit.Genkit
 	sc        *schats.StreamedChats
+	baseURI   string
+	graphURI  string
 }
 
-func InitMux(q *db.Queries) *http.ServeMux {
+func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 	ctx := context.Background()
 	g, err := genkit.Init(ctx,
 		genkit.WithPlugins(&googlegenai.GoogleAI{}),
@@ -37,10 +41,12 @@ func InitMux(q *db.Queries) *http.ServeMux {
 		panic(fmt.Sprintf("could not initialize Genkit: %v", err))
 	}
 	h := ChatHandler{
-		templates: templates.New("features/chat/views/*.html"),
+		templates: templates.New("web/features/chat/views/*.html"),
 		q:         q,
 		g:         g,
 		sc:        schats.New(),
+		baseURI:   baseURI,
+		graphURI:  graphURI,
 	}
 	m := http.NewServeMux()
 	m.HandleFunc("GET /{id}", h.getChat)
@@ -62,6 +68,9 @@ type ChatRender struct {
 type ChatViewData struct {
 	Chat       ChatRender
 	ChatTitles []db.FindChatTitlesRow
+	Keybinds   web.KeybindsTable
+	BaseURI    string
+	GraphURI   string
 }
 
 func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
@@ -90,6 +99,9 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 			Messages: renderMessages(chat),
 		},
 		ChatTitles: chatTitles,
+		Keybinds:   web.Keybinds,
+		BaseURI:    h.baseURI,
+		GraphURI:   h.graphURI,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
@@ -111,6 +123,9 @@ func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 			ID: uuid.New(),
 		},
 		ChatTitles: chatTitles,
+		Keybinds:   web.Keybinds,
+		BaseURI:    h.baseURI,
+		GraphURI:   h.graphURI,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
