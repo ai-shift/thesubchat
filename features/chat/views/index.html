@@ -4,31 +4,174 @@
     <head>
       <title>Shell>> chat</title>
       {{block "meta" .}}{{end}}
+      <script
+        src="https://rawgithub.com/ajaxorg/ace-builds/master/src/ace.js"
+        type="text/javascript"
+        charset="utf-8"
+      ></script>
+      <script
+        src="https://rawgithub.com/ajaxorg/ace-builds/master/src/ext-language_tools.js"
+        type="text/javascript"
+        charset="utf-8"
+      ></script>
+      <style>
+       .active {
+           background: #ed7eeb;
+           position: absolute;
+       }
+      </style>
     </head>
     <body class="flex flex-col flex-grow h-screen">
       <header class="flex justify-between items-center bg-gray-200">
-	{{if .Title}}
-	  <h1>{{.Title}}</h1>
-	  <div hx-get="{{.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
-	{{else}}
-	  <h1>New chat</h1>
-	{{end}}
-	{{if .Messages}}
-	  <a href="/chat" class="bg-blue-300 p-2">Start a new chat</a>
-	{{end}}
+        {{if .Chat.Title}}
+          <h1>{{.Chat.Title}}</h1>
+          <div hx-get="{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
+        {{else}}
+          <h1>New chat</h1>
+        {{end}}
+        {{if .Chat.Messages}}
+          <a href="/chat" class="bg-blue-300 p-2">Start a new chat</a>
+        {{end}}
       </header>
-      {{template "messages" .}}
+      {{template "messages" .Chat}}
       <form
-	hx-post="{{ .ID }}/message"
-	hx-target="#messages"
-	hx-on::after-request="if(event.detail.successful) this.reset()"
-	class="flex items-center justify-center bg-gray-400 p-4"
+        id="prompt"
+        hx-post="{{ .Chat.ID }}/message"
+        hx-vals='js:{
+            "prompt": editor.getValue(),
+            "mentions": JSON.stringify(mentionedChats.map(mention => mention.chat))
+            }'
+        hx-target="#messages"
+        hx-on::after-request="
+            if(event.detail.successful) this.reset()
+            editor.setValue()"
+        class="flex items-center justify-center bg-gray-400 p-4 pb-10"
       >
-	<div class="">
-	  <input id="prompt" name="prompt" type="text" required placeholder="Prompt...">
-	  <button type="submit">Send</button>
-	</div>
+      <div class="flex h-64 w-96">
+        <div id="editor" class="h-full w-full relative"></div>
+        <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
+      </div>
       </form>
     </body>
+    <script>
+     const chatTitlesIds = {{.ChatTitles}}.filter(chat => chat.ID !== {{.Chat.ID}})
+     let mentionedChats = []
+
+     var editor = ace.edit('editor');
+     var Range = ace.require('ace/range').Range;
+
+     editor.setOptions({
+       enableBasicAutocompletion: true,
+       behavioursEnabled: true,
+       enableLiveAutocompletion: true,
+       showGutter: false,
+       printMargin: false,
+     });
+
+     var mentionCompleter = {
+       identifierRegexps: [/^@.*/],
+       onInsert: (editor, completion) => {console.log(completion)},
+       getCompletions: function (editor, session, pos, prefix, callback) {
+         if (!prefix.startsWith("@")) {
+           return callback(null, [])
+         }
+
+         if (pos.column > 0) {
+           const symbolBeforeAt = editor.session.getTextRange({
+             start: {
+               ...pos,
+               column: pos.column - 2
+             },
+             end: {
+               ...pos,
+               column: pos.column - 1
+             }
+           });
+
+           if (!/^(\t|\s)+/.test(symbolBeforeAt) && pos.column > 1) return callback(null, [])
+         }
+
+
+         wordList = chatTitlesIds.filter(chat => {
+           return !mentionedChats.find(mentioned => mentioned.chat.ID === chat.ID)
+         })
+         callback(
+           null,
+           wordList.map(function (ea) {
+             return {
+               name: ea.Title,
+               value: "@" + ea.Title,
+               meta: 'mention',
+             };
+           })
+         );
+       },
+     };
+
+     editor.completers = [mentionCompleter]
+
+     // Set mark on mention and push chat to mentionedChats
+     editor.on("change", (event) => {
+       if (event.action !== "insert") return event
+       if (!event.lines[0].startsWith("@")) return event
+
+       const chatTitle = event.lines[0].slice(1);
+       const chat = chatTitlesIds.find( chat => chat.Title.startsWith(chatTitle) && chatTitle != "")
+       if (!chat) return event
+
+       const range = new Range(event.start.row, event.start.column, event.end.row, event.end.column)
+       const marker = editor.getSession().addMarker(range,"active", "text");
+       if (!marker) return event
+
+       mentionedChats.push({
+         chat,
+         marker,
+         range
+       })
+       return event
+     });
+
+     // Track changes in mentions ranges
+     editor.on("change", (event) => {
+       const eventRange = {start: event.start, end: event.end}
+
+       for (let i = 0; i < mentionedChats.length; i++) {
+         let chat = mentionedChats[i]
+         if (rangesAreEqual(chat.range, eventRange) || !rangesIntersect(chat.range, eventRange)) {
+           continue
+         }
+         editor.getSession().removeMarker(chat.marker)
+         editor.getSession().replace(chat.range, "")
+         mentionedChats.splice(i, 1)
+         break
+       }
+
+       return event
+     })
+
+     function rangesIntersect(rangeA, rangeB) {
+       function posIsBefore(p1, p2) {
+         return p1.row < p2.row || (p1.row === p2.row && p1.column < p2.column);
+       }
+       function posIsAfter(p1, p2) {
+         return p1.row > p2.row || (p1.row === p2.row && p1.column > p2.column);
+       }
+       function posIsEqual(p1, p2) {
+         return p1.row === p2.row && p1.column === p2.column;
+       }
+       if (posIsBefore(rangeA.end, rangeB.start) || posIsEqual(rangeA.end, rangeB.start)) {
+         return false;
+       }
+       if (posIsAfter(rangeA.start, rangeB.end) || posIsEqual(rangeA.start, rangeB.end)) {
+         return false;
+       }
+       return true;
+     }
+
+     function rangesAreEqual(rangeA, rangeB) {
+       return JSON.stringify(rangeA) === JSON.stringify(rangeB)
+     }
+
+    </script>
   </html>
 {{ end }}

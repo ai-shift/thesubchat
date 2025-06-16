@@ -5,10 +5,8 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
-	"github.com/firebase/genkit/go/genkit"
-	"github.com/firebase/genkit/go/plugins/googlegenai"
-	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 	"shellshift/features/chat/schats"
@@ -16,6 +14,10 @@ import (
 	"shellshift/internal/sse"
 	"shellshift/internal/templates"
 	"strings"
+
+	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/googlegenai"
+	"github.com/google/uuid"
 )
 
 type ChatHandler struct {
@@ -51,6 +53,11 @@ func InitMux(q *db.Queries) *http.ServeMux {
 	return m
 }
 
+type ChatViewData struct {
+	Chat       Chat
+	ChatTitles []db.FindChatTitlesRow
+}
+
 func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 	id, err := deserID(w, r)
 	if err != nil {
@@ -64,17 +71,15 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	err = h.templates.Render(w, "index", chat)
+	chatTitles, err := findChatsTitles(h.q)
 	if err != nil {
-		slog.Error("failed to render index page", "with", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("failed to find chat titles", "err", err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-}
-
-func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
-	err := h.templates.Render(w, "index", Chat{
-		ID: uuid.New(),
+	err = h.templates.Render(w, "index", ChatViewData{
+		Chat:       chat,
+		ChatTitles: chatTitles,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
@@ -83,13 +88,50 @@ func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
+	chatTitles, err := findChatsTitles(h.q)
+	if err != nil {
+		slog.Error("failed to find chat titles", "err", err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	err = h.templates.Render(w, "index", ChatViewData{
+		Chat: Chat{
+			ID: uuid.New(),
+		},
+		ChatTitles: chatTitles,
+	})
+	if err != nil {
+		slog.Error("failed to render index page", "with", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+type ChatMention struct {
+	ID    uuid.UUID
+	Title string
+}
+
 func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	// Validate request
 	prompt := r.FormValue("prompt")
+
 	if prompt == "" {
 		http.Error(w, "Prompt shouldn't be empty", http.StatusBadRequest)
 		return
 	}
+
+	mentionsJSON := r.FormValue("mentions")
+	mentions := []ChatMention{}
+
+	err := json.Unmarshal([]byte(mentionsJSON), &mentions)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	id, err := deserID(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -103,14 +145,22 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Get chat
 	chat, err := findChat(h.q, id)
+	userMsg := Message{Text: prompt, Role: "user"}
 	switch err {
 	case nil:
-		break
+		chat.Messages = append(chat.Messages, userMsg)
 	case sql.ErrNoRows:
 		waitTitle = true
-		chat = &Chat{
+		chat = Chat{
+			Title:    "New Chat",
 			ID:       id,
-			Messages: make([]Message, 0),
+			Messages: []Message{userMsg},
+		}
+		err := saveChat(r.Context(), h.q, chat)
+		if err != nil {
+			slog.Error("failed to initialize chat", "with", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		go func(ctx context.Context) {
 			t, err := genTitle(ctx, h.g, prompt)
@@ -126,33 +176,50 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chat.Messages = append(chat.Messages, Message{Text: prompt, Role: "user"})
+	mentionedChats := make([]Chat, len(mentions))
+
+	for i, v := range mentions {
+		chat, err := findChat(h.q, v.ID)
+		if err != nil {
+			slog.Error("failed to find mentioned chat", "err", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		mentionedChats[i] = chat
+	}
 
 	// Eval prompt
 	// TODO: Add timeout
 	stream := h.sc.Alloc(chat.ID)
-	go func(ctx context.Context, chat *Chat) {
-		msg, err := generateMessage(ctx, h.g, chat.Messages, stream.Chunks)
+	go func(ctx context.Context, chat Chat) {
+		msg, err := generateMessage(ctx, h.g, chat.Messages, mentionedChats, stream.Chunks)
 		close(stream.Chunks)
 		if err != nil {
 			slog.Error("failed to generate message", "with", err)
 			return
 		}
 		chat.Messages = append(chat.Messages, msg)
-		saveChat(ctx, h.q, *chat)
+		err = updateChatMessages(ctx, h.q, chat)
+		if err != nil {
+			slog.Error("failed to save chat after generation", "with", err)
+		}
 		stream.Done <- struct{}{}
-		slog.Error("message generation was finished")
 	}(context.Background(), chat)
 
 	if waitTitle {
 		slog.Info("waiting for the title generation")
 		select {
 		case title := <-tChan:
-			slog.Info("title generated")
-			chat.Title = title
-			// TODO: Save only title
-			saveChat(r.Context(), h.q, *chat)
-			slog.Info("Chat saved")
+			slog.Info("title generated", "value", title)
+			err := h.q.SaveChatTitle(r.Context(), db.SaveChatTitleParams{
+				ID:    chat.ID.String(),
+				Title: title,
+			})
+			if err != nil {
+				slog.Error("failed to save chat title", "with", err)
+			} else {
+				slog.Info("Chat title saved")
+			}
 		case err := <-errChan:
 			slog.Error("failed to generate title", "with", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -197,7 +264,7 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	msg := &Message{
-		Role: "assistant",
+		Role: "model",
 	}
 
 	for chunk := range stream.Chunks {
