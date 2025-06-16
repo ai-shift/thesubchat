@@ -144,7 +144,8 @@ const saveChatTitle = `-- name: SaveChatTitle :exec
 UPDATE
     chat
 SET
-    title = ?
+    title = ?,
+    updated_at = unixepoch()
 WHERE
     id = ?
 `
@@ -180,7 +181,8 @@ const updateChatMessages = `-- name: UpdateChatMessages :exec
 UPDATE
     chat
 SET
-    messages = ?
+    messages = ?,
+    updated_at = unixepoch()
 WHERE
     id = ?
 `

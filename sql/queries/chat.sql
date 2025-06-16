@@ -50,7 +50,8 @@ WHERE
 UPDATE
     chat
 SET
-    title = ?
+    title = ?,
+    updated_at = unixepoch()
 WHERE
     id = ?;
 
@@ -58,6 +59,7 @@ WHERE
 UPDATE
     chat
 SET
-    messages = ?
+    messages = ?,
+    updated_at = unixepoch()
 WHERE
     id = ?;

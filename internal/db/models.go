@@ -17,6 +17,11 @@ type ChatTag struct {
 	Name   string
 }
 
+type Mention struct {
+	SourceID string
+	TargetID string
+}
+
 type SchemaMigration struct {
 	ID string
 }
