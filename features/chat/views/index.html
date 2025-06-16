@@ -54,8 +54,8 @@
       </form>
     </body>
     <script>
-     const chatTitlesIds = {{.ChatTitles}}
-       let mentionedChats = []
+     const chatTitlesIds = {{.ChatTitles}}.filter(chat => chat.ID !== {{.Chat.ID}})
+     let mentionedChats = []
 
      var editor = ace.edit('editor');
      var Range = ace.require('ace/range').Range;
