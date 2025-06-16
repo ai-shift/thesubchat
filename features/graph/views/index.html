@@ -12,13 +12,13 @@
     <body>
       <div id="graph" style="width:full;height:100dvh;"></div>
       <a hx-trigger="keyup[key=='g'] from:body" hx-on::trigger='window.location=chatPath'></a>
-      <a hx-trigger="keyup[key=='n'] from:body" hx-on::trigger='window.location="/chat"'></a>
+      <a hx-trigger="keyup[key=='n'] from:body" hx-on::trigger='window.location="{{.ChatURI}}"'></a>
     </body>
     <script type="text/javascript">
      const elements = {{.Graph}}
 
      const searchChatId = new URLSearchParams(window.location.search).get("fromChat")
-     const chatPath = `/chat/${searchChatId}`
+     const chatPath = `{{.ChatURI}}/${searchChatId}`
 
      var cy = cytoscape({
        container: document.getElementById('graph'),

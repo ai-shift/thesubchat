@@ -24,9 +24,9 @@
     <body class="flex flex-col flex-grow h-screen">
       <header class="flex justify-between items-center bg-gray-200">
           <a hx-trigger="click, keyup[key=='g'] from:body"
-             hx-on::trigger='window.location="/graph?fromChat={{.Chat.ID}}"'
+             hx-on::trigger='window.location="{{.GraphURI}}?fromChat={{.Chat.ID}}"'
           >Graph</a>
-          <a hx-trigger="keyup[key=='n'] from:body" hx-on::trigger='window.location="/chat"'></a>
+          <a hx-trigger="keyup[key=='n'] from:body" hx-on::trigger='window.location="{{.ChatURI}}"'></a>
           {{if .Chat.Title}}
           <h1>{{.Chat.Title}}</h1>
           <div hx-get="{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
