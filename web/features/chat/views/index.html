@@ -61,7 +61,8 @@
         class="flex items-center justify-center bg-gray-400 p-4 pb-10"
       >
       <div class="flex h-64 w-96">
-        <div hx-trigger="{{.Keybinds.ToggleGraph.Value}}, {{.Keybinds.NewChat.Value}} consume" id="editor" class="h-full w-full relative"></div>
+        <div hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume,
+                         {{.Keybinds.NewChat.Value}} consume" id="editor" class="h-full w-full relative"></div>
         <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
       </div>
       </form>
