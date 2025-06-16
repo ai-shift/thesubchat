@@ -160,6 +160,23 @@ func (q *Queries) SaveChatTitle(ctx context.Context, arg SaveChatTitleParams) er
 	return err
 }
 
+const saveMention = `-- name: SaveMention :exec
+INSERT INTO
+    mention(target_id, source_id)
+VALUES
+    (?, ?) ON CONFLICT(target_id, source_id) DO NOTHING
+`
+
+type SaveMentionParams struct {
+	TargetID string
+	SourceID string
+}
+
+func (q *Queries) SaveMention(ctx context.Context, arg SaveMentionParams) error {
+	_, err := q.db.ExecContext(ctx, saveMention, arg.TargetID, arg.SourceID)
+	return err
+}
+
 const saveTag = `-- name: SaveTag :exec
 INSERT INTO
     chat_tag (chat_id, name)

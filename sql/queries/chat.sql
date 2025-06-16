@@ -63,3 +63,9 @@ SET
     updated_at = unixepoch()
 WHERE
     id = ?;
+
+-- name: SaveMention :exec
+INSERT INTO
+    mention(target_id, source_id)
+VALUES
+    (?, ?) ON CONFLICT(target_id, source_id) DO NOTHING;
