@@ -204,13 +204,22 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	mentionedChats := make([]Chat, len(mentions))
 
 	for i, v := range mentions {
-		chat, err := findChat(h.q, v.ID)
+		m, err := findChat(h.q, v.ID)
 		if err != nil {
 			slog.Error("failed to find mentioned chat", "err", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		mentionedChats[i] = chat
+    err = h.q.SaveMention(r.Context(), db.SaveMentionParams{
+      TargetID: v.ID.String(),
+      SourceID: chat.ID.String(),
+    })
+    if err != nil {
+      slog.Error("failed to save a mention", "with", err)
+      http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
+
+		mentionedChats[i] = m
 	}
 
 	// Eval prompt
