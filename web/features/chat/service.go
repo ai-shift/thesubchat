@@ -52,7 +52,7 @@ func findChatsTitles(q *db.Queries) ([]db.FindChatTitlesRow, error) {
 
 	chats, err := q.FindChatTitles(ctx)
 	if err != nil {
-		return nil, err
+		return chats, err
 	}
 	return chats, nil
 }
