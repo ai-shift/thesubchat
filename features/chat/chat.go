@@ -149,7 +149,6 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	switch err {
 	case nil:
 		chat.Messages = append(chat.Messages, userMsg)
-		break
 	case sql.ErrNoRows:
 		waitTitle = true
 		chat = Chat{
