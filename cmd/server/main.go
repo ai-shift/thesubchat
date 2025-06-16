@@ -3,10 +3,10 @@ package main
 import (
 	"log/slog"
 	"net/http"
-	"shellshift/features/chat"
-	"shellshift/features/graph"
 	"shellshift/internal/db"
 	"shellshift/internal/factory"
+	"shellshift/web/features/chat"
+	"shellshift/web/features/graph"
 )
 
 func main() {
