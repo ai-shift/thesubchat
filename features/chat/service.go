@@ -141,19 +141,6 @@ func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, ment
 	return
 }
 
-func markdownToHTML(markdownStr string) string {
-	extentions := parser.CommonExtensions | parser.MathJax | parser.SuperSubscript | parser.AutoHeadingIDs
-
-	p := parser.NewWithExtensions(extentions)
-	doc := p.Parse([]byte(markdownStr))
-
-	htmlFlags := html.CommonFlags
-	opts := html.RendererOptions{Flags: htmlFlags}
-	renderer := html.NewRenderer(opts)
-
-	return string(markdown.Render(doc, renderer))
-}
-
 type HTMLMessage struct {
 	Role string
 	Text template.HTML
@@ -165,9 +152,22 @@ func renderMessages(chat Chat) []HTMLMessage {
 	for i, v := range chat.Messages {
 		htmlMessages[i] = HTMLMessage{
 			Role: v.Role,
-			Text: template.HTML(markdownToHTML(v.Text)),
+			Text: markdownToHTML(v.Text),
 		}
 	}
 
 	return htmlMessages
+}
+
+func markdownToHTML(markdownStr string) template.HTML {
+	extentions := parser.CommonExtensions | parser.MathJax | parser.SuperSubscript | parser.AutoHeadingIDs
+
+	p := parser.NewWithExtensions(extentions)
+	doc := p.Parse([]byte(markdownStr))
+
+	htmlFlags := html.CommonFlags
+	opts := html.RendererOptions{Flags: htmlFlags}
+	renderer := html.NewRenderer(opts)
+
+	return template.HTML(string(markdown.Render(doc, renderer)))
 }

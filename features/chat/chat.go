@@ -273,12 +273,12 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg := &Message{
+	msg := &HTMLMessage{
 		Role: "model",
 	}
 
 	for chunk := range stream.Chunks {
-		msg.Text += chunk
+		msg.Text += markdownToHTML(chunk)
 		var tpl bytes.Buffer
 		if err := h.templates.Render(&tpl, "message", msg); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -286,7 +286,7 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 		}
 		sse.Send(w, sse.Event{
 			Type: "chunk",
-			Data: strings.Replace(tpl.String(), "\n", "<br>", -1),
+			Data: strings.Replace(tpl.String(), "\n", "", -1),
 		})
 	}
 
