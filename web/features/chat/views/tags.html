@@ -11,7 +11,12 @@
       hx-swap="beforeend"
       hx-on::after-request="if(event.detail.successful) this.reset()"
     >
-      <input type="text" id="tag" name="tag" placeholder="Add new tag" />
+        <input
+          type="text"
+          id="tag"
+          hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
+          name="tag"
+          placeholder="Add new tag" />
     </form>
   </div>
 {{end}}
