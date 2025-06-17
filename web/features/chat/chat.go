@@ -326,9 +326,9 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 }
 
 type ChatTags struct {
-	ID   string
-	Tags []Tag
-  Keybinds web.KeybindsTable
+	ID       string
+	Tags     []Tag
+	Keybinds web.KeybindsTable
 }
 
 type Tag struct {
@@ -403,9 +403,9 @@ func (h ChatHandler) getTags(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.templates.Render(w, "tags", ChatTags{
-		ID:   id.String(),
-		Tags: tags,
-    Keybinds: web.Keybinds,
+		ID:       id.String(),
+		Tags:     tags,
+		Keybinds: web.Keybinds,
 	})
 	if err != nil {
 		slog.Error("failed to render tempalte", "with", err)

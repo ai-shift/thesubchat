@@ -8,9 +8,6 @@
       <script src="https://unpkg.com/layout-base/layout-base.js"></script>
       <script src="https://unpkg.com/cose-base/cose-base.js"></script>
       <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
-      <style>
-
-      </style>
     </head>
     <body>
       <div id="graph" style="height:100dvh;"></div>
@@ -19,6 +16,7 @@
     </body>
     <script type="text/javascript">
      const elements = {{.Graph}}
+       const lastUsed = elements.find(el => el.data.level === 0)
        console.log(elements)
 
      const searchChatId = new URLSearchParams(window.location.search).get("fromChat")
@@ -27,16 +25,40 @@
      var cy = cytoscape({
        container: document.getElementById('graph'),
        elements,
-       ready: function(){
+       zoom: 0.09,
+       pan: {x: 100, y:100 },
+       ready: function({cy}){
+
          this.nodes().forEach((node) => {
-           if (node.data().level === undefined) return
-           let size = 30 - node.data().level * 3;
+           const level = node.data().level
+           if (level === undefined) return
+           const maxSize = 40;
+           const minSize = 10;
+           const maxLevel = 5;
+
+           if (level >= maxLevel) return minSize;
+
+           const sizeStep = (maxSize - minSize) / maxLevel;
+           const size =  maxSize - sizeStep * level;
            node.css("width", size);
            node.css("height", size);
+         })
+         var lastNode = cy.$id(lastUsed.data.id)
+         cy.centre(lastNode)
+
+         cy.animate({
+           zoom: 4,
+           center:{
+               eles: lastNode
+             },
+           duration: 1000,
+           easing: "ease-in-out"
          })
        },
        layout: {
          name: "fcose",
+         animate: false,
+         fit: false,
        },
        style: [
          {
@@ -45,11 +67,10 @@
              'background-color': '#2B65EC',
              'shape': 'diamond',
              'label': 'data(title)',
-             'font-size': "2px",
+             'font-size': "4px",
              'text-valign': "bottom",
              "text-margin-y" : "2px",
              "min-zoomed-font-size": "1px",
-             "grabbable": "false",
            }
          },
 
@@ -64,29 +85,25 @@
          {
            selector: 'edge',
            style: {
-             'line-color': '#2B65EC'
-           }
-         },
-
-         {
-           selector: 'node:selected',
-           style: {
-             'background-color': '#F08080',
-             'border-color': 'red'
+             'line-color': '#FFFF00',
+             'line-cap':'square',
+             "curve-style": "straight",
+             "width": 2,
+             "target-arrow-shape":"triangle",
+             "target-arrow-color":"#FFFF00"
            }
          },
 
          {
            selector: 'edge:selected',
            style: {
-             'line-color': '#F08080'
+
            }
          }
        ],
      });
 
      cy.nodes().ungrabify();
-     cy.autounselectify(true);
 
 
      cy.on("tap", "node", (e) =>
