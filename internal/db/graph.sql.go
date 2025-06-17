@@ -10,7 +10,43 @@ import (
 	"database/sql"
 )
 
-const getGraph = `-- name: GetGraph :many
+const findChatMentions = `-- name: FindChatMentions :many
+SELECT
+    target_id,
+    source_id
+FROM
+    mention
+`
+
+type FindChatMentionsRow struct {
+	TargetID string
+	SourceID string
+}
+
+func (q *Queries) FindChatMentions(ctx context.Context) ([]FindChatMentionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, findChatMentions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FindChatMentionsRow
+	for rows.Next() {
+		var i FindChatMentionsRow
+		if err := rows.Scan(&i.TargetID, &i.SourceID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const findChatTags = `-- name: FindChatTags :many
 SELECT
     c.id,
     c.title,
@@ -21,22 +57,22 @@ FROM
     RIGHT JOIN chat c ON t.chat_id = c.id
 `
 
-type GetGraphRow struct {
+type FindChatTagsRow struct {
 	ID        string
 	Title     string
 	UpdatedAt int64
 	Name      sql.NullString
 }
 
-func (q *Queries) GetGraph(ctx context.Context) ([]GetGraphRow, error) {
-	rows, err := q.db.QueryContext(ctx, getGraph)
+func (q *Queries) FindChatTags(ctx context.Context) ([]FindChatTagsRow, error) {
+	rows, err := q.db.QueryContext(ctx, findChatTags)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetGraphRow
+	var items []FindChatTagsRow
 	for rows.Next() {
-		var i GetGraphRow
+		var i FindChatTagsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,

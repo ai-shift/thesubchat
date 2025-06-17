@@ -1,4 +1,4 @@
--- name: GetGraph :many
+-- name: FindChatTags :many
 SELECT
     c.id,
     c.title,
@@ -7,3 +7,10 @@ SELECT
 FROM
     chat_tag t
     RIGHT JOIN chat c ON t.chat_id = c.id;
+
+-- name: FindChatMentions :many
+SELECT
+    target_id,
+    source_id
+FROM
+    mention;
