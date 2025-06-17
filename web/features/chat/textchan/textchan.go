@@ -1,11 +1,11 @@
-package schats
+package textchan
 
 import (
 	"github.com/google/uuid"
 	"sync"
 )
 
-type StreamedChats struct {
+type TextChan struct {
 	l sync.RWMutex
 	c map[uuid.UUID]*Stream
 }
@@ -15,13 +15,13 @@ type Stream struct {
 	Done   chan struct{}
 }
 
-func New() *StreamedChats {
-	return &StreamedChats{
+func New() *TextChan {
+	return &TextChan{
 		c: make(map[uuid.UUID]*Stream),
 	}
 }
 
-func (s *StreamedChats) Alloc(id uuid.UUID) *Stream {
+func (s *TextChan) Alloc(id uuid.UUID) *Stream {
 	st := &Stream{
 		Chunks: make(chan string, 100),
 		Done:   make(chan struct{}),
@@ -32,7 +32,7 @@ func (s *StreamedChats) Alloc(id uuid.UUID) *Stream {
 	return st
 }
 
-func (s *StreamedChats) Get(id uuid.UUID) (st *Stream, ok bool) {
+func (s *TextChan) Get(id uuid.UUID) (st *Stream, ok bool) {
 	s.l.RLock()
 	defer s.l.RUnlock()
 	st, ok = s.c[id]

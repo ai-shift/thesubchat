@@ -12,7 +12,7 @@ import (
 	"shellshift/internal/db"
 	"shellshift/internal/sse"
 	"shellshift/internal/templates"
-	"shellshift/web/features/chat/schats"
+	"shellshift/web/features/chat/textchan"
 	"strings"
 
 	"github.com/firebase/genkit/go/genkit"
@@ -26,7 +26,7 @@ type ChatHandler struct {
 	templates *templates.Templates
 	q         *db.Queries
 	g         *genkit.Genkit
-	sc        *schats.StreamedChats
+	msgChan   *textchan.TextChan
 	baseURI   string
 	graphURI  string
 }
@@ -44,7 +44,7 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 		templates: templates.New("web/features/chat/views/*.html"),
 		q:         q,
 		g:         g,
-		sc:        schats.New(),
+		msgChan:   textchan.New(),
 		baseURI:   baseURI,
 		graphURI:  graphURI,
 	}
@@ -225,7 +225,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Eval prompt
 	// TODO: Add timeout
-	stream := h.sc.Alloc(chat.ID)
+	stream := h.msgChan.Alloc(chat.ID)
 	go func(ctx context.Context, chat Chat) {
 		msg, err := generateMessage(ctx, h.g, chat.Messages, mentionedChats, stream.Chunks)
 		close(stream.Chunks)
@@ -294,7 +294,7 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stream, ok := h.sc.Get(id)
+	stream, ok := h.msgChan.Get(id)
 	if !ok {
 		sse.Send(w, sse.Event{
 			Type: "end",
