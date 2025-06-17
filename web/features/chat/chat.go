@@ -73,6 +73,7 @@ type ChatViewData struct {
 	GraphURI   string
 }
 
+// TODO: Add streaming message to new chat response
 func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 	id, err := deserID(w, r)
 	if err != nil {
