@@ -10,6 +10,9 @@
     {{range .Messages}}
       {{block "message" .}}{{end}}
     {{end}}
+    {{if .MessageGenerating}}
+      {{block "streamed-message" .}}{{end}}
+    {{end}}
     <div id="messagesEnd"></div>
   </div>
 {{end}}

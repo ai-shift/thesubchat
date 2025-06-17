@@ -63,9 +63,10 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 }
 
 type ChatRender struct {
-	ID       uuid.UUID
-	Title    string
-	Messages []HTMLMessage
+	ID                uuid.UUID
+	Title             string
+	Messages          []HTMLMessage
+	MessageGenerating bool
 }
 
 type ChatViewData struct {
@@ -98,11 +99,13 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, titleGenerating := h.titleChan.Get(id)
+	_, messageGenerating := h.msgChan.Get(id)
 	err = h.templates.Render(w, "index", ChatViewData{
 		Chat: ChatRender{
-			ID:       chat.ID,
-			Title:    chat.Title,
-			Messages: renderMessages(chat),
+			ID:                chat.ID,
+			Title:             chat.Title,
+			Messages:          renderMessages(chat),
+			MessageGenerating: messageGenerating,
 		},
 		TitleGenerating: titleGenerating,
 		ChatTitles:      chatTitles,
