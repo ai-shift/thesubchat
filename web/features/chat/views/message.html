@@ -1,1 +1,6 @@
-{{define "message"}}<div class="p-4 bg-gray-300"><p class="font-bold">{{.Role}}: </p>{{.Text}}</div>{{end}}
+{{define "message"}}
+    <div
+      class="p-4 {{if eq .Role "model"}} self-start {{else}} self-end text-end text-blue-600 {{end}}  max-w-4/5">
+        {{.Text}}
+    </div>
+{{end}}

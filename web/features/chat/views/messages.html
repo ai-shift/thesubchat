@@ -1,5 +1,5 @@
 {{ define "messages" }}
-  <div class="overflow-auto grow p-2 space-y-2" id="messages">
+  <div class="overflow-auto flex flex-col gap-5 grow p-2 space-y-2" id="messages">
     <script>
      document.addEventListener("htmx:sseMessage", e => {
        console.log("Got message", e)
