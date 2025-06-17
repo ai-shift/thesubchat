@@ -1,8 +1,10 @@
 package textchan
 
 import (
-	"github.com/google/uuid"
+	"log/slog"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 type TextChan struct {
@@ -29,6 +31,7 @@ func (s *TextChan) Alloc(id uuid.UUID) *Stream {
 	s.l.Lock()
 	defer s.l.Unlock()
 	s.c[id] = st
+	slog.Info("textchan was allocated", "length", len(s.c))
 	return st
 }
 
@@ -40,7 +43,22 @@ func (s *TextChan) Get(id uuid.UUID) (st *Stream, ok bool) {
 }
 
 func (s *TextChan) Free(id uuid.UUID) {
+	// Get current state
+	s.l.RLock()
+	st, ok := s.c[id]
+	if !ok {
+		return
+	}
+	s.l.RUnlock()
+
+	// Mark chan done
+	st.Done <- struct{}{}
+	close(st.Chunks)
+
+	// Delete entry
 	s.l.Lock()
 	defer s.l.Unlock()
 	delete(s.c, id)
+
+	slog.Info("textchan was freed", "id", id)
 }

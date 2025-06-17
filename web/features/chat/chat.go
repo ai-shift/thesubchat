@@ -197,7 +197,6 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			stream := h.titleChan.Alloc(id)
 			defer h.titleChan.Free(id)
-			defer close(stream.Chunks)
 
 			// Generate title
 			t, err := genTitle(titleCtx, h.g, prompt)
@@ -249,8 +248,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	// TODO: Add timeout
 	go func(ctx context.Context, chat Chat) {
 		stream := h.msgChan.Alloc(chat.ID)
-		defer h.msgChan.Free(id)
-		defer close(stream.Chunks)
+		defer h.msgChan.Free(chat.ID)
 
 		msg, err := generateMessage(ctx, h.g, chat.Messages, mentionedChats, stream.Chunks)
 		if err != nil {
@@ -262,7 +260,6 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			slog.Error("failed to save chat after generation", "with", err)
 		}
-		stream.Done <- struct{}{}
 	}(context.Background(), chat)
 
 	// Redirect to the new page
@@ -323,7 +320,7 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 	stream, ok := h.msgChan.Get(id)
 	if !ok {
 		sse.Send(w, sse.Event{
-			Type: "end",
+			Type: "finished",
 			Data: "There is no stream",
 		})
 		return
@@ -334,21 +331,27 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var raw string
-	for chunk := range stream.Chunks {
-		raw += chunk
-		msg.Text = markdownToHTML(raw)
-		var tpl bytes.Buffer
-		if err := h.templates.Render(&tpl, "message", msg); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+
+loop:
+	for {
+		select {
+		case chunk := <-stream.Chunks:
+			raw += chunk
+			msg.Text = markdownToHTML(raw)
+			var tpl bytes.Buffer
+			if err := h.templates.Render(&tpl, "message", msg); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			sse.Send(w, sse.Event{
+				Type: "chunk",
+				Data: strings.Replace(tpl.String(), "\n", "", -1),
+			})
+		case <-stream.Done:
+			break loop
 		}
-		sse.Send(w, sse.Event{
-			Type: "chunk",
-			Data: strings.Replace(tpl.String(), "\n", "", -1),
-		})
 	}
 
-	<-stream.Done
 	sse.Send(w, sse.Event{
 		Type: "finished",
 		Data: "",

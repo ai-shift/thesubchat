@@ -146,7 +146,7 @@ func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, ment
 	if err != nil {
 		return
 	}
-	slog.Info("model response", "text", resp.Text())
+	slog.Info("model response", "length", len(resp.Text()))
 	msg.Role = "model"
 	msg.Text = resp.Text()
 	return

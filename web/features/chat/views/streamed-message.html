@@ -1,5 +1,11 @@
 {{define "streamed-message"}}
-  <div id="streamed-message" hx-ext="sse" sse-connect="{{.ID}}/message/stream" sse-swap="chunk"></div>
+  <div
+    id="streamed-message"
+    hx-ext="sse"
+    sse-connect="{{.ID}}/message/stream"
+    sse-swap="chunk"
+    sse-close="finished"
+  ></div>
   <script>
     document.getElementById('streamed-message')
       .scrollIntoView({
