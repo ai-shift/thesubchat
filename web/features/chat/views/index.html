@@ -28,12 +28,14 @@
            >
            Graph
         </a>
-        {{if .Chat.Title}}
-          <h1>{{.Chat.Title}}</h1>
-          <div hx-get="{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
-        {{else}}
-          <h1>New chat</h1>
-        {{end}}
+        <h1>
+          {{if .TitleGenerating}}
+            <span hx-get="{{.Chat.ID}}/title" hx-trigger="load"></span>
+          {{else}}
+            {{.Chat.Title}}
+          {{end}}
+        </h1>
+        <div hx-get="{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
         {{if .Chat.Messages}}
           <a
               href="{{.BaseURI}}"
