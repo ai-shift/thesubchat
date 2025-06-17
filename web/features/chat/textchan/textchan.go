@@ -38,3 +38,9 @@ func (s *TextChan) Get(id uuid.UUID) (st *Stream, ok bool) {
 	st, ok = s.c[id]
 	return
 }
+
+func (s *TextChan) Free(id uuid.UUID) {
+	s.l.Lock()
+	defer s.l.Unlock()
+	delete(s.c, id)
+}

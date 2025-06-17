@@ -195,8 +195,11 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		newChatCreated = true
 		titleCtx := context.Background()
 		go func() {
-			// Generate title
 			stream := h.titleChan.Alloc(id)
+			defer h.titleChan.Free(id)
+			defer close(stream.Chunks)
+
+			// Generate title
 			t, err := genTitle(titleCtx, h.g, prompt)
 			if err != nil {
 				slog.Error("failed to generate title", "with", err)
@@ -205,7 +208,6 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 
 			// Publish title
 			stream.Chunks <- t
-			close(stream.Chunks)
 
 			// Persist title
 			err = h.q.SaveChatTitle(titleCtx, db.SaveChatTitleParams{
@@ -245,10 +247,12 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Eval prompt
 	// TODO: Add timeout
-	stream := h.msgChan.Alloc(chat.ID)
 	go func(ctx context.Context, chat Chat) {
+		stream := h.msgChan.Alloc(chat.ID)
+		defer h.msgChan.Free(id)
+		defer close(stream.Chunks)
+
 		msg, err := generateMessage(ctx, h.g, chat.Messages, mentionedChats, stream.Chunks)
-		close(stream.Chunks)
 		if err != nil {
 			slog.Error("failed to generate message", "with", err)
 			return
