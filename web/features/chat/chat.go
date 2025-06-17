@@ -51,8 +51,9 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 		graphURI:  graphURI,
 	}
 	m := http.NewServeMux()
-	m.HandleFunc("GET /{id}", h.getChat)
 	m.HandleFunc("GET /", h.getEmptyChat)
+	m.HandleFunc("GET /{id}", h.getChat)
+	m.HandleFunc("DELETE /{id}", h.deleteChat)
 	m.HandleFunc("POST /{id}/message", h.postUserMessage)
 	m.HandleFunc("GET /{id}/message/stream", h.getMessageStream)
 	m.HandleFunc("GET /{id}/title", h.getTitle)
@@ -118,6 +119,25 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func (h ChatHandler) deleteChat(w http.ResponseWriter, r *http.Request) {
+	// Validate id
+	id, err := deserID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Delete chat
+	err = h.q.DeleteChat(r.Context(), id.String())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Redirect
+	w.Header().Set("HX-Redirect", h.graphURI)
 }
 
 func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
