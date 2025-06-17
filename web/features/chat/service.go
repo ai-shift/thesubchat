@@ -113,20 +113,22 @@ func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, ment
 	for i, msg := range msgs {
 		mapped[i] = ai.NewTextMessage(ai.Role(msg.Role), msg.Text)
 	}
-	mentionedBlob, err := json.Marshal(mentioned)
-	if err != nil {
-		return msg, fmt.Errorf("faield to serialize mentioned chats with %w", err)
-	}
-	slog.Info("blob", "text", string(mentionedBlob))
-	mapped = append(mapped, ai.NewTextMessage(ai.RoleUser, string(mentionedBlob)))
 
-	for _, msg := range mapped {
-		slog.Info("Got message", "msg", fmt.Sprintf("%#v", msg))
+	docs := make([]*ai.Document, len(mentioned))
+	for i, c := range mentioned {
+		b, err := json.Marshal(c)
+		if err != nil {
+			return msg, fmt.Errorf("faield to serialize mentioned chats with %w", err)
+		}
+		docs[i] = ai.DocumentFromText(string(b), map[string]any{
+			"chatTitle": c.Title,
+		})
 	}
 
 	// Request model
 	resp, err := genkit.Generate(ctx, g,
 		ai.WithMessages(mapped...),
+		ai.WithDocs(docs...),
 		ai.WithStreaming(func(ctx context.Context, chunk *ai.ModelResponseChunk) error {
 			s <- chunk.Text()
 			return nil
