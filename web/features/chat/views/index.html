@@ -62,8 +62,10 @@
       >
       <div class="flex w-full max-w-[60rem]">
           <div class="h-full w-full relative p-3 bg-white">
-              <div hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume,
-                               {{.Keybinds.NewChat.Value}} consume" id="editor" class="h-full w-full relative"></div>
+              <div
+                id="editor"
+                hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
+                class="h-full w-full relative"></div>
           </div>
           <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
       </div>
