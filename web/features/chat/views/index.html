@@ -4,16 +4,6 @@
     <head>
       <title>Shell>> chat</title>
       {{block "meta" .}}{{end}}
-      <script
-        src="https://rawgithub.com/ajaxorg/ace-builds/master/src/ace.js"
-        type="text/javascript"
-        charset="utf-8"
-      ></script>
-      <script
-        src="https://rawgithub.com/ajaxorg/ace-builds/master/src/ext-language_tools.js"
-        type="text/javascript"
-        charset="utf-8"
-      ></script>
       <style>
        .active {
            background: #ed7eeb;
@@ -45,7 +35,10 @@
           </a>
         {{end}}
       </header>
-      {{template "messages" .Chat}}
+      <div class="flex flex-1 items-strech overflow-y-auto">
+          <div hx-get="{{.BranchURI}}" hx-swap="outerHTML" hx-trigger="load"></div>
+          {{template "messages" .Chat}}
+      </div>
       <form
         id="prompt"
         hx-post="{{ .Chat.ID }}/message"
