@@ -72,6 +72,9 @@
       </form>
     </body>
     <script>
+     document.getElementById("messages").scrollTo(0, 9999999)
+    </script>
+    <script>
      const chatTitlesIds = ({{.ChatTitles}} ?? []).filter(chat => chat.ID !== {{.Chat.ID}})
      let mentionedChats = []
 
