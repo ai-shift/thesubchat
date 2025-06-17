@@ -1,8 +1,8 @@
 {{define "tags"}}
-  <div class="flex flex-col space-y-2 p-2">
+  <div class="flex flex-col space-y-2">
     <div class="flex flex-col space-y-2" id="saved-tags">
       {{range .Tags}}
-	{{block "tag" .}}{{end}}
+        {{block "tag" .}}{{end}}
       {{end}}
     </div>
     <form

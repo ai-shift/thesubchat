@@ -72,7 +72,13 @@
       </form>
     </body>
     <script>
-     document.getElementById("messages").scrollTo(0, 9999999)
+      document.addEventListener("DOMContentLoaded", (evt) => {
+        document.getElementById('messagesEnd')
+          .scrollIntoView({
+            behavior: "smooth",
+            block: "end",
+          });
+      })
     </script>
     <script>
      const chatTitlesIds = ({{.ChatTitles}} ?? []).filter(chat => chat.ID !== {{.Chat.ID}})
