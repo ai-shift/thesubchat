@@ -39,16 +39,23 @@ func (h GraphHandler) getGraph(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	chats, err := h.q.GetGraph(ctx)
+	chats, err := h.q.FindChatTags(ctx)
 	if err != nil {
-		slog.Error("failed to find chat", "err", err.Error())
+		slog.Error("failed to find chats", "err", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	mentions, err := h.q.FindChatMentions(ctx)
+	if err != nil {
+		slog.Error("failed to find chat mentions", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	err = h.t.Render(w, "index", Graph{
 		ChatURI:  h.chatURI,
-		Graph:    buildGraph(chats),
+		Graph:    buildGraph(chats, mentions),
 		Keybinds: web.Keybinds,
 	})
 
