@@ -8,6 +8,9 @@
       <script src="https://unpkg.com/layout-base/layout-base.js"></script>
       <script src="https://unpkg.com/cose-base/cose-base.js"></script>
       <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
+      <style>
+
+      </style>
     </head>
     <body>
       <div id="graph" style="height:100dvh;"></div>
@@ -16,6 +19,7 @@
     </body>
     <script type="text/javascript">
      const elements = {{.Graph}}
+       console.log(elements)
 
      const searchChatId = new URLSearchParams(window.location.search).get("fromChat")
      const chatPath = `{{.ChatURI}}/${searchChatId}`
@@ -38,21 +42,14 @@
          {
            selector: 'node',
            style: {
-             'background-color': '#666',
-           }
-         },
-         {
-           selector: 'edge',
-           style: {
-             'line-color': '#ccc',
-             'width': 3
-           }
-         }
-       ],style: [
-         {
-           selector: 'node',
-           style: {
              'background-color': '#2B65EC',
+             'shape': 'diamond',
+             'label': 'data(title)',
+             'font-size': "2px",
+             'text-valign': "bottom",
+             "text-margin-y" : "2px",
+             "min-zoomed-font-size": "1px",
+             "grabbable": "false",
            }
          },
 
@@ -87,6 +84,10 @@
          }
        ],
      });
+
+     cy.nodes().ungrabify();
+     cy.autounselectify(true);
+
 
      cy.on("tap", "node", (e) =>
        {
