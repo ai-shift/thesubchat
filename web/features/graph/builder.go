@@ -2,6 +2,7 @@ package graph
 
 import (
 	"cmp"
+	"fmt"
 	"shellshift/internal/db"
 	"slices"
 	"strings"
@@ -42,7 +43,7 @@ type EdgeData struct {
 	Target string `json:"target"`
 }
 
-func buildGraph(chats []db.GetGraphRow) []any {
+func buildGraph(chats []db.FindChatTagsRow, mentions []db.FindChatMentionsRow) []any {
 	if len(chats) == 0 {
 		return []any{}
 	}
@@ -104,6 +105,7 @@ func buildGraph(chats []db.GetGraphRow) []any {
 		})
 	}
 
+	graph = slices.Concat(graph, mentionEdges(mentions))
 	return graph
 }
 
@@ -112,7 +114,22 @@ type TagGroup struct {
 	ChatIds []string
 }
 
-func groupTags(chats []db.GetGraphRow) []TagGroup {
+func mentionEdges(mentions []db.FindChatMentionsRow) []any {
+	edges := make([]any, len(mentions))
+	for i, v := range mentions {
+		edges[i] = Edge{
+			Group: "edges",
+			Data: EdgeData{
+				ID:     fmt.Sprintf("%s:%s", v.SourceID, v.TargetID),
+				Source: v.SourceID,
+				Target: v.TargetID,
+			},
+		}
+	}
+	return edges
+}
+
+func groupTags(chats []db.FindChatTagsRow) []TagGroup {
 	var tagGroups []TagGroup
 
 	for _, chat := range chats {
