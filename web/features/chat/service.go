@@ -57,16 +57,25 @@ func findChatsTitles(q *db.Queries) ([]db.FindChatTitlesRow, error) {
 	return chats, nil
 }
 
+type generatedTitle struct {
+	Title string `json:"title"`
+}
+
 func genTitle(ctx context.Context, g *genkit.Genkit, msg string) (string, error) {
 	slog.Info("generating title chat")
-	resp, err := genkit.Generate(ctx, g,
-		ai.WithModelName("googleai/gemini-2.0-flash"),
-		ai.WithPrompt("Create a concise, 3-5 word phrase as a header for the following query, strictly adhering to the 3-5 word limit and avoiding the use of the word 'title':", msg),
-	)
+	prompt := genkit.LookupPrompt(g, "title-generation")
+	if prompt == nil {
+		return "", fmt.Errorf("failed to find title generation prompt")
+	}
+	resp, err := prompt.Execute(ctx, ai.WithInput(map[string]any{"query": msg}))
 	if err != nil {
 		return "", err
 	}
-	return resp.Text(), err
+	var output generatedTitle
+	if err := resp.Output(&output); err != nil {
+		return "", fmt.Errorf("failed to parse router output with %w", err)
+	}
+	return output.Title, err
 }
 
 func saveChat(ctx context.Context, q *db.Queries, c Chat) error {
