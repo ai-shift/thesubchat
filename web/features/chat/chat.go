@@ -52,7 +52,7 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 	m.HandleFunc("GET /{id}", h.getChat)
 	m.HandleFunc("GET /", h.getEmptyChat)
 	m.HandleFunc("POST /{id}/message", h.postUserMessage)
-	m.HandleFunc("GET /{id}/message", h.getMessageStream)
+	m.HandleFunc("GET /{id}/message/stream", h.getMessageStream)
 	m.HandleFunc("GET /{id}/tags", h.getTags)
 	m.HandleFunc("POST /{id}/tags", h.postTags)
 	m.HandleFunc("DELETE /{id}/tags", h.deleteTags)
@@ -269,9 +269,14 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Render messages
-	err = h.templates.Render(w, "messages", chat)
+	err = h.templates.Render(w, "message", chat.Messages[len(chat.Messages)-1])
 	if err != nil {
-		slog.Error("failed to render index page", "with", err.Error())
+		slog.Error("failed to render user message", "with", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	err = h.templates.Render(w, "streamed-message", chat)
+	if err != nil {
+		slog.Error("failed to render streamed message", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

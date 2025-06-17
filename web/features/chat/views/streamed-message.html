@@ -1,0 +1,3 @@
+{{define "streamed-message"}}
+  <div hx-ext="sse" sse-connect="{{.ID}}/message/stream" sse-swap="chunk"></div>
+{{end}}
