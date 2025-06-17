@@ -69,3 +69,9 @@ INSERT INTO
     mention(target_id, source_id)
 VALUES
     (?, ?) ON CONFLICT(target_id, source_id) DO NOTHING;
+
+-- name: DeleteChat :exec
+DELETE FROM
+    chat
+WHERE
+    id = ?;

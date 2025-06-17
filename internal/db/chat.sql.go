@@ -9,6 +9,18 @@ import (
 	"context"
 )
 
+const deleteChat = `-- name: DeleteChat :exec
+DELETE FROM
+    chat
+WHERE
+    id = ?
+`
+
+func (q *Queries) DeleteChat(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteChat, id)
+	return err
+}
+
 const deleteTag = `-- name: DeleteTag :exec
 DELETE FROM
     chat_tag

@@ -57,16 +57,25 @@ func findChatsTitles(q *db.Queries) ([]db.FindChatTitlesRow, error) {
 	return chats, nil
 }
 
+type generatedTitle struct {
+	Title string `json:"title"`
+}
+
 func genTitle(ctx context.Context, g *genkit.Genkit, msg string) (string, error) {
 	slog.Info("generating title chat")
-	resp, err := genkit.Generate(ctx, g,
-		ai.WithModelName("googleai/gemini-2.0-flash"),
-		ai.WithPrompt("Create a concise, 3-5 word phrase as a header for the following query, strictly adhering to the 3-5 word limit and avoiding the use of the word 'title':", msg),
-	)
+	prompt := genkit.LookupPrompt(g, "title-generation")
+	if prompt == nil {
+		return "", fmt.Errorf("failed to find title generation prompt")
+	}
+	resp, err := prompt.Execute(ctx, ai.WithInput(map[string]any{"query": msg}))
 	if err != nil {
 		return "", err
 	}
-	return resp.Text(), err
+	var output generatedTitle
+	if err := resp.Output(&output); err != nil {
+		return "", fmt.Errorf("failed to parse router output with %w", err)
+	}
+	return output.Title, err
 }
 
 func saveChat(ctx context.Context, q *db.Queries, c Chat) error {
@@ -113,20 +122,22 @@ func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, ment
 	for i, msg := range msgs {
 		mapped[i] = ai.NewTextMessage(ai.Role(msg.Role), msg.Text)
 	}
-	mentionedBlob, err := json.Marshal(mentioned)
-	if err != nil {
-		return msg, fmt.Errorf("faield to serialize mentioned chats with %w", err)
-	}
-	slog.Info("blob", "text", string(mentionedBlob))
-	mapped = append(mapped, ai.NewTextMessage(ai.RoleUser, string(mentionedBlob)))
 
-	for _, msg := range mapped {
-		slog.Info("Got message", "msg", fmt.Sprintf("%#v", msg))
+	docs := make([]*ai.Document, len(mentioned))
+	for i, c := range mentioned {
+		b, err := json.Marshal(c)
+		if err != nil {
+			return msg, fmt.Errorf("faield to serialize mentioned chats with %w", err)
+		}
+		docs[i] = ai.DocumentFromText(string(b), map[string]any{
+			"chatTitle": c.Title,
+		})
 	}
 
 	// Request model
 	resp, err := genkit.Generate(ctx, g,
 		ai.WithMessages(mapped...),
+		ai.WithDocs(docs...),
 		ai.WithStreaming(func(ctx context.Context, chunk *ai.ModelResponseChunk) error {
 			s <- chunk.Text()
 			return nil
@@ -135,7 +146,7 @@ func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, ment
 	if err != nil {
 		return
 	}
-	slog.Info("model response", "text", resp.Text())
+	slog.Info("model response", "length", len(resp.Text()))
 	msg.Role = "model"
 	msg.Text = resp.Text()
 	return

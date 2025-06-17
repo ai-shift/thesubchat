@@ -1,8 +1,7 @@
-{{ define "messages" }}
+{{define "messages"}}
   <div class="overflow-auto flex flex-col gap-3 grow px-3" id="messages">
     <script>
      document.addEventListener("htmx:sseMessage", e => {
-       console.log("Got message", e)
        const messagesDiv = document.getElementById("messages");
        messagesDiv.scrollTop = messagesDiv.scrollHeight;
      })
@@ -10,8 +9,9 @@
     {{range .Messages}}
       {{block "message" .}}{{end}}
     {{end}}
-    <div hx-ext="sse" sse-connect="{{.ID}}/message" sse-swap="chunk">
-    </div>
+    {{if .MessageGenerating}}
+      {{block "streamed-message" .}}{{end}}
+    {{end}}
     <div id="messagesEnd"></div>
   </div>
 {{end}}

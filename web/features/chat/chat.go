@@ -12,7 +12,7 @@ import (
 	"shellshift/internal/db"
 	"shellshift/internal/sse"
 	"shellshift/internal/templates"
-	"shellshift/web/features/chat/schats"
+	"shellshift/web/features/chat/textchan"
 	"strings"
 
 	"github.com/firebase/genkit/go/genkit"
@@ -26,7 +26,8 @@ type ChatHandler struct {
 	templates *templates.Templates
 	q         *db.Queries
 	g         *genkit.Genkit
-	sc        *schats.StreamedChats
+	msgChan   *textchan.TextChan
+	titleChan *textchan.TextChan
 	baseURI   string
 	graphURI  string
 	branchURI string
@@ -46,16 +47,19 @@ func InitMux(q *db.Queries, baseURI, graphURI, branchURI string) *http.ServeMux 
 		templates: templates.New("web/features/chat/views/*.html"),
 		q:         q,
 		g:         g,
-		sc:        schats.New(),
+		msgChan:   textchan.New(),
+		titleChan: textchan.New(),
 		baseURI:   baseURI,
 		graphURI:  graphURI,
 		branchURI: branchURI,
 	}
 	m := http.NewServeMux()
-	m.HandleFunc("GET /{id}", h.getChat)
 	m.HandleFunc("GET /", h.getEmptyChat)
+	m.HandleFunc("GET /{id}", h.getChat)
+	m.HandleFunc("DELETE /{id}", h.deleteChat)
 	m.HandleFunc("POST /{id}/message", h.postUserMessage)
-	m.HandleFunc("GET /{id}/message", h.getMessageStream)
+	m.HandleFunc("GET /{id}/message/stream", h.getMessageStream)
+	m.HandleFunc("GET /{id}/title", h.getTitle)
 	m.HandleFunc("GET /{id}/tags", h.getTags)
 	m.HandleFunc("POST /{id}/tags", h.postTags)
 	m.HandleFunc("DELETE /{id}/tags", h.deleteTags)
@@ -63,20 +67,23 @@ func InitMux(q *db.Queries, baseURI, graphURI, branchURI string) *http.ServeMux 
 }
 
 type ChatRender struct {
-	ID       uuid.UUID
-	Title    string
-	Messages []HTMLMessage
+	ID                uuid.UUID
+	Title             string
+	Messages          []HTMLMessage
+	MessageGenerating bool
 }
 
 type ChatViewData struct {
-	Chat       ChatRender
-	ChatTitles []db.FindChatTitlesRow
-	Keybinds   web.KeybindsTable
-	BaseURI    string
-	GraphURI   string
-	BranchURI  string
+	Chat            ChatRender
+	TitleGenerating bool
+	ChatTitles      []db.FindChatTitlesRow
+	Keybinds        web.KeybindsTable
+	BaseURI         string
+	GraphURI        string
+	BranchURI       string
 }
 
+// TODO: Add streaming message to new chat response
 func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 	id, err := deserID(w, r)
 	if err != nil {
@@ -97,23 +104,46 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_, titleGenerating := h.titleChan.Get(id)
+	_, messageGenerating := h.msgChan.Get(id)
 	err = h.templates.Render(w, "index", ChatViewData{
 		Chat: ChatRender{
-			ID:       chat.ID,
-			Title:    chat.Title,
-			Messages: renderMessages(chat),
+			ID:                chat.ID,
+			Title:             chat.Title,
+			Messages:          renderMessages(chat),
+			MessageGenerating: messageGenerating,
 		},
-		ChatTitles: chatTitles,
-		Keybinds:   web.Keybinds,
-		BaseURI:    h.baseURI,
-		GraphURI:   h.graphURI,
-		BranchURI:  h.branchURI,
+		TitleGenerating: titleGenerating,
+		ChatTitles:      chatTitles,
+		Keybinds:        web.Keybinds,
+		BaseURI:         h.baseURI,
+		GraphURI:        h.graphURI,
+		BranchURI:       h.branchURI,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func (h ChatHandler) deleteChat(w http.ResponseWriter, r *http.Request) {
+	// Validate id
+	id, err := deserID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Delete chat
+	err = h.q.DeleteChat(r.Context(), id.String())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Redirect
+	w.Header().Set("HX-Redirect", h.graphURI)
 }
 
 func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
@@ -170,19 +200,14 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Maybe title generation
-	errChan := make(chan error)
-	tChan := make(chan string)
-	var waitTitle bool
-
 	// Get chat
 	chat, err := findChat(h.q, id)
 	userMsg := Message{Text: prompt, Role: "user"}
+	var newChatCreated bool
 	switch err {
 	case nil:
 		chat.Messages = append(chat.Messages, userMsg)
 	case sql.ErrNoRows:
-		waitTitle = true
 		chat = Chat{
 			Title:    "New Chat",
 			ID:       id,
@@ -194,14 +219,31 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		go func(ctx context.Context) {
-			t, err := genTitle(ctx, h.g, prompt)
+		newChatCreated = true
+		titleCtx := context.Background()
+		go func() {
+			stream := h.titleChan.Alloc(id)
+			defer h.titleChan.Free(id)
+
+			// Generate title
+			t, err := genTitle(titleCtx, h.g, prompt)
 			if err != nil {
-				errChan <- err
-			} else {
-				tChan <- t
+				slog.Error("failed to generate title", "with", err)
+				return
 			}
-		}(r.Context())
+
+			// Publish title
+			stream.Chunks <- t
+
+			// Persist title
+			err = h.q.SaveChatTitle(titleCtx, db.SaveChatTitleParams{
+				ID:    chat.ID.String(),
+				Title: t,
+			})
+			if err != nil {
+				slog.Error("failed to save chat title", "with", err)
+			}
+		}()
 	default:
 		slog.Error("failed to find chat", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -231,10 +273,11 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Eval prompt
 	// TODO: Add timeout
-	stream := h.sc.Alloc(chat.ID)
 	go func(ctx context.Context, chat Chat) {
+		stream := h.msgChan.Alloc(chat.ID)
+		defer h.msgChan.Free(chat.ID)
+
 		msg, err := generateMessage(ctx, h.g, chat.Messages, mentionedChats, stream.Chunks)
-		close(stream.Chunks)
 		if err != nil {
 			slog.Error("failed to generate message", "with", err)
 			return
@@ -244,41 +287,47 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			slog.Error("failed to save chat after generation", "with", err)
 		}
-		stream.Done <- struct{}{}
 	}(context.Background(), chat)
 
-	if waitTitle {
-		slog.Info("waiting for the title generation")
-		select {
-		case title := <-tChan:
-			slog.Info("title generated", "value", title)
-			err := h.q.SaveChatTitle(r.Context(), db.SaveChatTitleParams{
-				ID:    chat.ID.String(),
-				Title: title,
-			})
-			if err != nil {
-				slog.Error("failed to save chat title", "with", err)
-			} else {
-				slog.Info("Chat title saved")
-			}
-		case err := <-errChan:
-			slog.Error("failed to generate title", "with", err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
 	// Redirect to the new page
-	if waitTitle {
+	if newChatCreated {
 		slog.Error("redirecting to the created chat")
 		w.Header().Set("HX-Redirect", chat.ID.String())
 		return
 	}
 
 	// Render messages
-	err = h.templates.Render(w, "messages", chat)
+	err = h.templates.Render(w, "message", chat.Messages[len(chat.Messages)-1])
 	if err != nil {
-		slog.Error("failed to render index page", "with", err.Error())
+		slog.Error("failed to render user message", "with", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	err = h.templates.Render(w, "streamed-message", chat)
+	if err != nil {
+		slog.Error("failed to render streamed message", "with", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (h ChatHandler) getTitle(w http.ResponseWriter, r *http.Request) {
+	// Validate data
+	id, err := deserID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Wait for the generated title
+	stream, ok := h.titleChan.Get(id)
+	if !ok {
+		http.Error(w, "There is no any generating title", http.StatusNotFound)
+		return
+	}
+
+	// Render result
+	title := <-stream.Chunks
+	_, err = w.Write([]byte(title))
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -295,10 +344,10 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stream, ok := h.sc.Get(id)
+	stream, ok := h.msgChan.Get(id)
 	if !ok {
 		sse.Send(w, sse.Event{
-			Type: "end",
+			Type: "finished",
 			Data: "There is no stream",
 		})
 		return
@@ -309,21 +358,27 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var raw string
-	for chunk := range stream.Chunks {
-		raw += chunk
-		msg.Text = markdownToHTML(raw)
-		var tpl bytes.Buffer
-		if err := h.templates.Render(&tpl, "message", msg); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+
+loop:
+	for {
+		select {
+		case chunk := <-stream.Chunks:
+			raw += chunk
+			msg.Text = markdownToHTML(raw)
+			var tpl bytes.Buffer
+			if err := h.templates.Render(&tpl, "message", msg); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			sse.Send(w, sse.Event{
+				Type: "chunk",
+				Data: strings.Replace(tpl.String(), "\n", "", -1),
+			})
+		case <-stream.Done:
+			break loop
 		}
-		sse.Send(w, sse.Event{
-			Type: "chunk",
-			Data: strings.Replace(tpl.String(), "\n", "", -1),
-		})
 	}
 
-	<-stream.Done
 	sse.Send(w, sse.Event{
 		Type: "finished",
 		Data: "",

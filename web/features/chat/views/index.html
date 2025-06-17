@@ -18,12 +18,14 @@
            >
            Graph
         </a>
-        {{if .Chat.Title}}
-          <h1>{{.Chat.Title}}</h1>
-          <div hx-get="{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
-        {{else}}
-          <h1>New chat</h1>
-        {{end}}
+        <h1>
+          {{if .TitleGenerating}}
+            <span hx-get="{{.Chat.ID}}/title" hx-trigger="load"></span>
+          {{else}}
+            {{.Chat.Title}}
+          {{end}}
+        </h1>
+        <div hx-get="{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
         {{if .Chat.Messages}}
           <a
               href="{{.BaseURI}}"
@@ -48,10 +50,11 @@
             "mentions": JSON.stringify(mentionedChats.map(mention => mention.chat))
             }'
         hx-target="#messages"
+        hx-swap="beforeend"
         hx-on::after-request="
             if(event.detail.successful) this.reset()
             editor.setValue()"
-        class="flex items-center justify-center bg-gray-300 p-4 pb-10"
+        class="relative flex items-center justify-center bg-gray-300 p-4 pb-10"
       >
       <div class="flex w-full max-w-[60rem]">
           <div class="h-full w-full relative p-3 bg-white">
@@ -62,6 +65,15 @@
           </div>
           <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
       </div>
+      {{if .Chat.Messages}}
+        <button 
+          class="absolute bottom-2 left-2"
+          hx-delete="{{.Chat.ID}}"
+          hx-confirm="Chat {{.Chat.Title}} will be deleted"
+          >
+          delete
+        </button>
+      {{end}}
       </form>
     </body>
     <script>
