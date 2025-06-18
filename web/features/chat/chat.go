@@ -59,6 +59,7 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 	m.HandleFunc("DELETE /{id}", h.deleteChat)
 	m.HandleFunc("POST /{id}/branch/{branchId}/message", h.postUserMessage)
 	m.HandleFunc("GET /{id}/branch/{branchId}/message/stream", h.getMessageStream)
+	m.HandleFunc("GET /{id}/branch/{branchId}/merge", h.getMerge)
 	m.HandleFunc("GET /{id}/title", h.getTitle)
 	m.HandleFunc("GET /{id}/tags", h.getTags)
 	m.HandleFunc("POST /{id}/tags", h.postTags)
@@ -439,6 +440,41 @@ loop:
 	})
 
 	<-r.Context().Done()
+}
+
+func (h ChatHandler) getMerge(w http.ResponseWriter, r *http.Request) {
+	// Validate data
+	chatID, err := deserID(w, r)
+	var errs []error
+	if err != nil {
+		errs = append(errs, err)
+	}
+	// Branch param always exists because of routing
+	branchID, _, err := deserBranchID(w, r)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		http.Error(w, errors.Join(errs...).Error(), http.StatusBadRequest)
+		return
+	}
+
+	branch, err := findChatBranch(r.Context(), h.q, chatID, branchID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	if len(branch.Messages) < 2 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	err = h.templates.Render(w, "merge-button", nil)
+	if err != nil {
+		slog.Error("failed to render tempalte", "with", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 type ChatTags struct {
