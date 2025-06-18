@@ -19,8 +19,8 @@
        const signInDiv = document.getElementById('sign-in')
 
        Clerk.mountSignIn(signInDiv, {
-         fallbackRedirectUrl: {{.HomeURI}},
-         signUpUrl:{{.RegisterURI}},
+         forceRedirectUrl: {{.HomeURI}},
+         signUpUrl: {{.RegisterURI}},
        })
      })
     </script>
