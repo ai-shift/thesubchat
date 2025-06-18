@@ -4,6 +4,7 @@ Install required tools:
 - [Go](https://go.dev/doc/install)
 - [Turso](https://docs.turso.tech/quickstart)
 - [geni](https://github.com/emilpriver/geni?tab=readme-ov-file#installation)
+- [clerk](https://clerk.com/)
 
 Setup DB:
 
@@ -14,6 +15,7 @@ Set Env vars (can be copy pasted from `.env.example` and sourced):
 export DATABASE_URL=
 export DATABASE_TOKEN=
 export GEMINI_API_KEY=
+export CLERK_SECRET_KEY=
 ```
 
 Run:
