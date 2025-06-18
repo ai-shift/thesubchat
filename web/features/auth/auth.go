@@ -154,7 +154,7 @@ func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.
 		}
 
 		// Refresh token in needed
-		_, err = clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
+		claims, err := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
 			Token: sessionCookie.Value,
 			JWK:   m.jwk,
 		})
@@ -207,15 +207,15 @@ func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.
 			sessionCookie.Expires = time.Now().Add(60 * time.Second)
 			http.SetCookie(w, sessionCookie)
 			slog.Info("cookie was updated")
-		}
 
-		claims, err := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
-			Token: sessionCookie.Value,
-			JWK:   m.jwk,
-		})
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			claims, err = clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
+				Token: sessionCookie.Value,
+				JWK:   m.jwk,
+			})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 
 		usr, err := user.Get(r.Context(), claims.Subject)
