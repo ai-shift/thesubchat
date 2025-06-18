@@ -311,9 +311,10 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Eval prompt
 	// TODO: Add timeout
-	go func(ctx context.Context, chat Chat) {
-		stream := h.msgChan.Alloc(chat.ID)
-		defer h.msgChan.Free(chat.ID)
+	go func(branch Branch) {
+		ctx := context.Background()
+		stream := h.msgChan.Alloc(branch.ID)
+		defer h.msgChan.Free(branch.ID)
 
 		msg, err := generateMessage(ctx, h.g,
 			slices.Concat(chat.Messages, branch.Messages),
@@ -329,7 +330,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			slog.Error("failed to save chat after generation", "with", err)
 		}
-	}(context.Background(), chat)
+	}(branch)
 
 	// Redirect to the new page
 	if newChatCreated || len(branch.Messages) == 1 {
@@ -347,21 +348,24 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to render user message", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	err = h.templates.Render(w, "streamed-message", StreamedMessageView{
-		ChatID:   chat.ID.String(),
-		BranchID: branch.ID.String(),
-		BaseURI:  h.baseURI,
-	})
-	if err != nil {
+	view := StreamedMessageView{BaseURI: h.baseURI}
+	view.Chat.ID = chat.ID.String()
+	view.Branch.ID = branch.ID.String()
+
+	if err := h.templates.Render(w, "streamed-message", view); err != nil {
 		slog.Error("failed to render streamed message", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 type StreamedMessageView struct {
-	ChatID   string
-	BranchID string
-	BaseURI  string
+	Chat struct {
+		ID string
+	}
+	Branch struct {
+		ID string
+	}
+	BaseURI string
 }
 
 func (h ChatHandler) getTitle(w http.ResponseWriter, r *http.Request) {

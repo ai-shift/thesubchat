@@ -30,7 +30,7 @@
         </a>
         <h1>
           {{if .TitleGenerating}}
-            <span hx-get="{{.Chat.ID}}/title" hx-trigger="load"></span>
+            <span hx-get="{{.BaseURI}}/{{.Chat.ID}}/title" hx-trigger="load"></span>
           {{else}}
             {{.Chat.Title}}
           {{end}}
@@ -40,6 +40,7 @@
           id="merge-button-container"
           hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/merge"
           hx-trigger="load, messageStreamFinished"
+          hx-swap="outerHTML"
         ></div>
         {{if .Chat.Messages}}
           <a

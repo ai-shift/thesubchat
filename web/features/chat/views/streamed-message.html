@@ -2,7 +2,7 @@
   <div
     id="streamed-message"
     hx-ext="sse"
-    sse-connect="{{.BaseURI}}/{{.ChatID}}/branch/{.BranchID}/message/stream"
+    sse-connect="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/message/stream"
     sse-swap="chunk"
     sse-close="finished"
   ></div>
