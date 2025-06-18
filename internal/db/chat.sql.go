@@ -61,6 +61,28 @@ func (q *Queries) FindChat(ctx context.Context, id string) (FindChatRow, error) 
 	return i, err
 }
 
+const findChatBranch = `-- name: FindChatBranch :one
+SELECT
+    messages
+FROM
+    chat_branch
+WHERE
+    chat_id = ?
+    AND id = ?
+`
+
+type FindChatBranchParams struct {
+	ChatID string
+	ID     string
+}
+
+func (q *Queries) FindChatBranch(ctx context.Context, arg FindChatBranchParams) ([]byte, error) {
+	row := q.db.QueryRowContext(ctx, findChatBranch, arg.ChatID, arg.ID)
+	var messages []byte
+	err := row.Scan(&messages)
+	return messages, err
+}
+
 const findChatTitles = `-- name: FindChatTitles :many
 SELECT
     id,

@@ -75,3 +75,12 @@ DELETE FROM
     chat
 WHERE
     id = ?;
+
+-- name: FindChatBranch :one
+SELECT
+    messages
+FROM
+    chat_branch
+WHERE
+    chat_id = ?
+    AND id = ?;

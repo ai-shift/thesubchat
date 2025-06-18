@@ -53,6 +53,7 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 	m := http.NewServeMux()
 	m.HandleFunc("GET /", h.getEmptyChat)
 	m.HandleFunc("GET /{id}", h.getChat)
+	m.HandleFunc("GET /{id}/branch/{branchId}", h.getChatBranch)
 	m.HandleFunc("DELETE /{id}", h.deleteChat)
 	m.HandleFunc("POST /{id}/message", h.postUserMessage)
 	m.HandleFunc("GET /{id}/message/stream", h.getMessageStream)
@@ -118,6 +119,41 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to render index page", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+}
+
+func (h ChatHandler) getChatBranch(w http.ResponseWriter, r *http.Request) {
+	// Validate request params
+	id, err := deserID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	branchId, err := deserBranchID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Find branch chat
+	branch, err := h.q.FindChatBranch(r.Context(), db.FindChatBranchParams{
+		ID:     branchId.String(),
+		ChatID: id.String(),
+	})
+	switch err {
+	case nil:
+		break
+	case sql.ErrNoRows:
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Render result
+	if err := h.templates.Render(w, "index", branch); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -496,6 +532,15 @@ func deserID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, err error) {
 	id, err = uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		slog.Error("failed to parse chat", "id", id, "with", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	return
+}
+
+func deserBranchID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, err error) {
+	id, err = uuid.Parse(r.PathValue("branchID"))
+	if err != nil {
+		slog.Error("failed to parse branch id", "id", id, "with", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 	return
