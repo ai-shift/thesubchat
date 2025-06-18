@@ -1,0 +1,28 @@
+{{ define "login" }}
+  <!DOCTYPE html>
+  <html lang="en">
+    <head>
+        <title>Shell>> chat</title>
+        {{block "meta" .}}{{end}}
+    </head>
+    <body class="h-[100dvh] flex justify-center items-center">
+        <div id="app"></div>
+    </body>
+    <script>
+     window.addEventListener('load', async function () {
+       await Clerk.load()
+
+       document.getElementById('app').innerHTML = `
+           <div id="sign-in"></div>
+       `
+
+       const signInDiv = document.getElementById('sign-in')
+
+       Clerk.mountSignIn(signInDiv, {
+         fallbackRedirectUrl: {{.HomeURI}},
+         signUpUrl:{{.RegisterURI}},
+       })
+     })
+    </script>
+  </html>
+{{ end }}
