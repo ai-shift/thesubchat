@@ -139,13 +139,25 @@ func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.
 		}
 		slog.Info("unsafe claims", "val", unsafeClaims)
 
-		// Refresh token in needed
- 		_, err = jwt.ParseSigned(sessionCookie.Value)
-		// claims, err := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
-		//   Token: sessionCookie.Value,
-		// })
+		// Retrieve JSON web key
+		if m.jwk == nil {
+			jwk, err := clerkjwt.GetJSONWebKey(r.Context(), &clerkjwt.GetJSONWebKeyParams{
+				KeyID:      unsafeClaims.KeyID,
+				JWKSClient: m.jwksClient,
+			})
+			if err != nil {
+				slog.Error("Error while getting JWK", "with", err)
+				http.Error(w, err.Error(), http.StatusUnauthorized)
+				return
+			}
+			m.jwk = jwk
+		}
 
-		slog.Error("Error here!!!!!!!!!!!!!!!!!", "err", err)
+		// Refresh token in needed
+		_, err = clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
+			Token: sessionCookie.Value,
+			JWK:   m.jwk,
+		})
 		switch err {
 		default:
 			http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -194,20 +206,7 @@ func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.
 			sessionCookie.Value = out.JWT
 			sessionCookie.Expires = time.Now().Add(60 * time.Second)
 			http.SetCookie(w, sessionCookie)
-		}
-
-		if m.jwk == nil {
-			jwk, err := clerkjwt.GetJSONWebKey(r.Context(), &clerkjwt.GetJSONWebKeyParams{
-				KeyID:      unsafeClaims.KeyID,
-				JWKSClient: m.jwksClient,
-			})
-
-			if err != nil {
-        slog.Error("Error while getting JWK", "with", err)
-				http.Error(w, err.Error(), http.StatusUnauthorized)
-				return
-			}
-			m.jwk = jwk
+			slog.Info("cookie was updated")
 		}
 
 		claims, err := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
