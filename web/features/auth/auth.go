@@ -1,4 +1,4 @@
-package authhttp
+package auth
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/clerk/clerk-sdk-go/v2"
@@ -29,24 +28,19 @@ type AuthHandler struct {
 	homeURI     string
 }
 
-func InitMux(q *db.Queries, loginURI, registerURI, homeURI string) *http.ServeMux {
+func InitMux(q *db.Queries, protector *ProtectionMiddleware, loginURI, registerURI, homeURI string) *http.ServeMux {
 	h := AuthHandler{
-		t:           templates.New("web/features/authhttp/views/*.html"),
+		t:           templates.New("web/features/auth/views/*.html"),
 		q:           q,
 		loginURI:    loginURI,
 		registerURI: registerURI,
 		homeURI:     homeURI,
 	}
 
-	jwkStore := NewJWKStore()
-	config := &clerk.ClientConfig{}
-	config.Key = clerk.String(os.Getenv("CLERK_SECRET_KEY"))
-	jwksClient := jwks.NewClient(config)
-
 	m := http.NewServeMux()
 	m.HandleFunc("GET /login", h.getLogin)
 	m.HandleFunc("GET /register", h.getRegister)
-	m.HandleFunc("GET /profile", h.getProfile)
+	m.HandleFunc("GET /profile", protector.Protect(h.getProfile))
 	return m
 }
 
@@ -86,42 +80,56 @@ func (h AuthHandler) getRegister(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h AuthHandler) getProfile(w http.ResponseWriter, r *http.Request){
-		err := h.t.Render(w, "profile", RegisterRender{
-			LoginURI: h.loginURI,
-			HomeURI:  h.homeURI,
-		})
+func (h AuthHandler) getProfile(w http.ResponseWriter, r *http.Request) {
+	err := h.t.Render(w, "profile", RegisterRender{
+		LoginURI: h.loginURI,
+		HomeURI:  h.homeURI,
+	})
 
-		if err != nil {
-			slog.Error("failed to render PROFILE", "with", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	if err != nil {
+		slog.Error("failed to render PROFILE", "with", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 type ProtectionMiddleware struct {
-  clerkSK string
-  jwk *clerk.JSONWebKey
-  jwkClient *jwks.Client
+	clerkSK    string
+	jwk        *clerk.JSONWebKey
+	jwksClient *jwks.Client
+}
+
+func NewProtectionMiddleware(clerkSK string) *ProtectionMiddleware {
+	config := &clerk.ClientConfig{}
+	config.Key = clerk.String(clerkSK)
+
+	return &ProtectionMiddleware{
+		clerkSK:    clerkSK,
+		jwksClient: jwks.NewClient(config),
+	}
 }
 
 type sessionRefresh struct {
 	JWT string `json:"jwt"`
 }
 
+type userIDKey string
+
+const UserIDKey userIDKey = "user_id"
+
 // TODO: Use JWK
 func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
-  return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 
-
-  // Get the session JWT from the Authorization header
+		// Get the session JWT from the Authorization header
 		sessionCookie, err := r.Cookie("__session")
 		if err != nil {
+			slog.Error("Filed to extract cookie", "with", err)
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 
-    // Decode the session JWT so that we can find the key ID.
+		// Decode the session JWT so that we can find the key ID.
 		unsafeClaims, err := clerkjwt.Decode(r.Context(), &clerkjwt.DecodeParams{
 			Token: sessionCookie.Value,
 		})
@@ -131,8 +139,13 @@ func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.
 		}
 		slog.Info("unsafe claims", "val", unsafeClaims)
 
-    // Refresh token in needed
-    _, err = jwt.ParseSigned(sessionCookie.Value)
+		// Refresh token in needed
+ 		_, err = jwt.ParseSigned(sessionCookie.Value)
+		// claims, err := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
+		//   Token: sessionCookie.Value,
+		// })
+
+		slog.Error("Error here!!!!!!!!!!!!!!!!!", "err", err)
 		switch err {
 		default:
 			http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -183,36 +196,37 @@ func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.
 			http.SetCookie(w, sessionCookie)
 		}
 
-    if m.jwk == nil {
-      jwk, err := clerkjwt.GetJSONWebKey(r.Context(), &clerkjwt.GetJSONWebKeyParams{
+		if m.jwk == nil {
+			jwk, err := clerkjwt.GetJSONWebKey(r.Context(), &clerkjwt.GetJSONWebKeyParams{
 				KeyID:      unsafeClaims.KeyID,
-				JWKSClient: m.jwkClient,
+				JWKSClient: m.jwksClient,
 			})
 
 			if err != nil {
+        slog.Error("Error while getting JWK", "with", err)
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 				return
 			}
-      m.jwk = jwk
-    }
+			m.jwk = jwk
+		}
 
-    claims, err := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
-      Token: sessionCookie.Value,
-      JWK: m.jwk,
-			})
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
+		claims, err := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
+			Token: sessionCookie.Value,
+			JWK:   m.jwk,
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-    usr, err := user.Get(r.Context(), claims.Subject)
+		usr, err := user.Get(r.Context(), claims.Subject)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		slog.Info("fetched user", "val", usr)
 
-    r = r.WithContext(context.WithValue(r.Context(), "user_id", usr.ID))
+		r = r.WithContext(context.WithValue(r.Context(), UserIDKey, usr.ID))
 
-    next(w, r)
-  }
+		next(w, r)
+	}
 }

@@ -9,6 +9,7 @@ import (
 	"shellshift/internal/db"
 	"shellshift/internal/templates"
 	"shellshift/web"
+	"shellshift/web/features/auth"
 )
 
 type GraphHandler struct {
@@ -17,7 +18,7 @@ type GraphHandler struct {
 	q       *db.Queries
 }
 
-func InitMux(q *db.Queries, chatURI string) *http.ServeMux {
+func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, chatURI string) *http.ServeMux {
 	h := GraphHandler{
 		chatURI: chatURI,
 		t:       templates.New("web/features/graph/views/*.html"),

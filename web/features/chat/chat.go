@@ -12,6 +12,7 @@ import (
 	"shellshift/internal/db"
 	"shellshift/internal/sse"
 	"shellshift/internal/templates"
+	"shellshift/web/features/auth"
 	"shellshift/web/features/chat/schats"
 	"strings"
 
@@ -31,7 +32,7 @@ type ChatHandler struct {
 	graphURI  string
 }
 
-func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
+func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, baseURI, graphURI string) *http.ServeMux {
 	ctx := context.Background()
 	g, err := genkit.Init(ctx,
 		genkit.WithPlugins(&googlegenai.GoogleAI{}),
