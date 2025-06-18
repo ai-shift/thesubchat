@@ -58,7 +58,7 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 	m.HandleFunc("GET /{id}/branch/{branchId}", h.getChat)
 	m.HandleFunc("DELETE /{id}", h.deleteChat)
 	m.HandleFunc("POST /{id}/branch/{branchId}/message", h.postUserMessage)
-	m.HandleFunc("GET /{id}/message/stream", h.getMessageStream)
+	m.HandleFunc("GET /{id}/branch/{branchId}/message/stream", h.getMessageStream)
 	m.HandleFunc("GET /{id}/title", h.getTitle)
 	m.HandleFunc("GET /{id}/tags", h.getTags)
 	m.HandleFunc("POST /{id}/tags", h.postTags)
@@ -332,6 +332,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Redirect to the new page
 	if newChatCreated || len(branch.Messages) == 1 {
+		slog.Info("New chat & branch created")
 		w.Header().Set(
 			"HX-Redirect",
 			fmt.Sprintf("%s/%s/branch/%s", h.baseURI, chat.ID.String(), branchID.String()),
@@ -340,16 +341,26 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Render messages
-	err = h.templates.Render(w, "message", chat.Messages[len(chat.Messages)-1])
+	err = h.templates.Render(w, "message", branch.Messages[len(branch.Messages)-1])
 	if err != nil {
 		slog.Error("failed to render user message", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	err = h.templates.Render(w, "streamed-message", chat)
+	err = h.templates.Render(w, "streamed-message", StreamedMessageView{
+		ChatID:   chat.ID.String(),
+		BranchID: branch.ID.String(),
+		BaseURI:  h.baseURI,
+	})
 	if err != nil {
 		slog.Error("failed to render streamed message", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+type StreamedMessageView struct {
+	ChatID   string
+	BranchID string
+	BaseURI  string
 }
 
 func (h ChatHandler) getTitle(w http.ResponseWriter, r *http.Request) {
