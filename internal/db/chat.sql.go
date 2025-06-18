@@ -211,6 +211,29 @@ func (q *Queries) SaveMention(ctx context.Context, arg SaveMentionParams) error 
 	return err
 }
 
+const saveOrUpdateChatBranchMessages = `-- name: SaveOrUpdateChatBranchMessages :exec
+INSERT INTO
+    chat_branch (id, chat_id, messages)
+VALUES
+    (?, ?, ?) ON conflict (id, chat_id) DO
+UPDATE
+SET
+    id = excluded.id,
+    chat_id = excluded.chat_id,
+    messages = excluded.messages
+`
+
+type SaveOrUpdateChatBranchMessagesParams struct {
+	ID       string
+	ChatID   string
+	Messages []byte
+}
+
+func (q *Queries) SaveOrUpdateChatBranchMessages(ctx context.Context, arg SaveOrUpdateChatBranchMessagesParams) error {
+	_, err := q.db.ExecContext(ctx, saveOrUpdateChatBranchMessages, arg.ID, arg.ChatID, arg.Messages)
+	return err
+}
+
 const saveTag = `-- name: SaveTag :exec
 INSERT INTO
     chat_tag (chat_id, name)

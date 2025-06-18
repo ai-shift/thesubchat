@@ -14,6 +14,7 @@ import (
 	"shellshift/internal/sse"
 	"shellshift/internal/templates"
 	"shellshift/web/features/chat/textchan"
+	"slices"
 	"strings"
 
 	"github.com/firebase/genkit/go/genkit"
@@ -242,7 +243,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	var newChatCreated bool
 	switch err {
 	case nil:
-		chat.Messages = append(chat.Messages, userMsg)
+		break
 	// TODO: Move to service
 	case sql.ErrNoRows:
 		// Create new chat
@@ -296,6 +297,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	branch.Messages = append(branch.Messages, userMsg)
 
 	// Get mentioned chats
 	mentionedChats := make([]Chat, len(mentions))
@@ -328,13 +330,17 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		stream := h.msgChan.Alloc(chat.ID)
 		defer h.msgChan.Free(chat.ID)
 
-		msg, err := generateMessage(ctx, h.g, chat.Messages, mentionedChats, stream.Chunks)
+		msg, err := generateMessage(ctx, h.g,
+			slices.Concat(chat.Messages, branch.Messages),
+			mentionedChats,
+			stream.Chunks,
+		)
 		if err != nil {
 			slog.Error("failed to generate message", "with", err)
 			return
 		}
-		chat.Messages = append(chat.Messages, msg)
-		err = updateChatMessages(ctx, h.q, chat)
+		branch.Messages = append(branch.Messages, msg)
+		err = updateBranchMessages(ctx, h.q, chat.ID, branch)
 		if err != nil {
 			slog.Error("failed to save chat after generation", "with", err)
 		}

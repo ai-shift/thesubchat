@@ -47,10 +47,12 @@ func findChat(ctx context.Context, q *db.Queries, id uuid.UUID) (Chat, error) {
 }
 
 type Branch struct {
+	ID       uuid.UUID
 	Messages []Message
 }
 
 func findChatBranch(ctx context.Context, q *db.Queries, chatID uuid.UUID, branchID uuid.UUID) (b Branch, _ error) {
+	b.ID = branchID
 	msgsBlob, err := q.FindChatBranch(ctx, db.FindChatBranchParams{
 		ID:     branchID.String(),
 		ChatID: chatID.String(),
@@ -63,12 +65,11 @@ func findChatBranch(ctx context.Context, q *db.Queries, chatID uuid.UUID, branch
 	default:
 		return b, err
 	}
-	var msgs []Message
-	err = json.Unmarshal(msgsBlob, &msgs)
+	err = json.Unmarshal(msgsBlob, &b.Messages)
 	if err != nil {
 		return b, err
 	}
-	return Branch{Messages: msgs}, nil
+	return b, nil
 }
 
 func findChatsTitles(q *db.Queries) ([]db.FindChatTitlesRow, error) {
@@ -122,6 +123,7 @@ func saveChat(ctx context.Context, q *db.Queries, c Chat) error {
 	return nil
 }
 
+//lint:ignore U1000 Will be used later
 func updateChatMessages(ctx context.Context, q *db.Queries, c Chat) error {
 	slog.Info("updating chat messages", "id", c.ID)
 	encoded, err := json.Marshal(c.Messages)
@@ -135,6 +137,25 @@ func updateChatMessages(ctx context.Context, q *db.Queries, c Chat) error {
 	})
 	if err != nil {
 		slog.Error("failed to update chat messages", "err", err)
+		return err
+	}
+	return nil
+}
+
+func updateBranchMessages(ctx context.Context, q *db.Queries, chatID uuid.UUID, b Branch) error {
+	slog.Info("updating branch messages", "chatId", chatID, "id", b.ID)
+	encoded, err := json.Marshal(b.Messages)
+	if err != nil {
+		slog.Error("failed to encode branch messages", "err", err)
+		return err
+	}
+	err = q.SaveOrUpdateChatBranchMessages(ctx, db.SaveOrUpdateChatBranchMessagesParams{
+		ID:       b.ID.String(),
+		ChatID:   chatID.String(),
+		Messages: encoded,
+	})
+	if err != nil {
+		slog.Error("failed to persist branch messages", "err", err)
 		return err
 	}
 	return nil
