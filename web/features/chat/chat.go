@@ -55,7 +55,7 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 	m := http.NewServeMux()
 	m.HandleFunc("GET /", h.getEmptyChat)
 	m.HandleFunc("GET /{id}", h.getChat)
-	m.HandleFunc("GET /{id}/branch/{branchId}", h.getChatBranch)
+	m.HandleFunc("GET /{id}/branch/{branchId}", h.getChat)
 	m.HandleFunc("DELETE /{id}", h.deleteChat)
 	m.HandleFunc("POST /{id}/branch/{branchId}/message", h.postUserMessage)
 	m.HandleFunc("GET /{id}/message/stream", h.getMessageStream)
@@ -67,19 +67,20 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 }
 
 type ChatRender struct {
-	ID                uuid.UUID
-	Title             string
-	Messages          []HTMLMessage
-	MessageGenerating bool
+	ID       uuid.UUID
+	Title    string
+	Messages []HTMLMessage
 }
 
 type ChatViewData struct {
-	Chat            ChatRender
-	TitleGenerating bool
-	ChatTitles      []db.FindChatTitlesRow
-	Keybinds        web.KeybindsTable
-	BaseURI         string
-	GraphURI        string
+	Chat              ChatRender
+	Branch            Branch
+	TitleGenerating   bool
+	ChatTitles        []db.FindChatTitlesRow
+	Keybinds          web.KeybindsTable
+	BaseURI           string
+	GraphURI          string
+	MessageGenerating bool
 }
 
 // TODO: Add streaming message to new chat response
@@ -90,6 +91,20 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	branchID, exists, err := deserBranchID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var branch Branch
+	if exists {
+		branch, err = findChatBranch(r.Context(), h.q, id, branchID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	} else {
+		branch = Branch{ID: uuid.New()}
+	}
 	chat, err := findChat(r.Context(), h.q, id)
 	if err != nil {
 		slog.Error("failed to find chat", "err", err.Error())
@@ -97,65 +112,32 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	chatTitles, err := findChatsTitles(h.q)
+
 	if err != nil {
 		slog.Error("failed to find chat titles", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	_, titleGenerating := h.titleChan.Get(id)
-	_, messageGenerating := h.msgChan.Get(id)
+	_, messageGenerating := h.msgChan.Get(branch.ID)
 	err = h.templates.Render(w, "index", ChatViewData{
 		Chat: ChatRender{
-			ID:                chat.ID,
-			Title:             chat.Title,
-			Messages:          renderMessages(chat),
-			MessageGenerating: messageGenerating,
+			ID:       chat.ID,
+			Title:    chat.Title,
+			Messages: renderMessages(chat),
 		},
-		TitleGenerating: titleGenerating,
-		ChatTitles:      chatTitles,
-		Keybinds:        web.Keybinds,
-		BaseURI:         h.baseURI,
-		GraphURI:        h.graphURI,
+		Branch:            branch,
+		TitleGenerating:   titleGenerating,
+		ChatTitles:        chatTitles,
+		Keybinds:          web.Keybinds,
+		BaseURI:           h.baseURI,
+		GraphURI:          h.graphURI,
+		MessageGenerating: messageGenerating,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-}
-
-func (h ChatHandler) getChatBranch(w http.ResponseWriter, r *http.Request) {
-	// Validate request params
-	id, err := deserID(w, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	branchId, err := deserBranchID(w, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Find branch chat
-	branch, err := h.q.FindChatBranch(r.Context(), db.FindChatBranchParams{
-		ID:     branchId.String(),
-		ChatID: id.String(),
-	})
-	switch err {
-	case nil:
-		break
-	case sql.ErrNoRows:
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	default:
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Render result
-	if err := h.templates.Render(w, "index", branch); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -190,6 +172,7 @@ func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 		Chat: ChatRender{
 			ID: uuid.New(),
 		},
+		Branch:     Branch{ID: uuid.New()},
 		ChatTitles: chatTitles,
 		Keybinds:   web.Keybinds,
 		BaseURI:    h.baseURI,
@@ -227,7 +210,8 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		errs = append(errs, err)
 	}
 
-	branchID, err := deserBranchID(w, r)
+	// Branch ID always exists because of routing
+	branchID, _, err := deserBranchID(w, r)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -567,10 +551,16 @@ func deserID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, err error) {
 	return
 }
 
-func deserBranchID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, err error) {
-	id, err = uuid.Parse(r.PathValue("branchID"))
+func deserBranchID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, exists bool, err error) {
+	branchID := r.PathValue("branchId")
+	if branchID == "" {
+		slog.Info("got empty branchId")
+		return
+	}
+	exists = true
+	id, err = uuid.Parse(branchID)
 	if err != nil {
-		slog.Error("failed to parse branch id", "id", id, "with", err)
+		slog.Error("failed to parse branch", "id", id, "with", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 	return

@@ -35,7 +35,7 @@
             {{.Chat.Title}}
           {{end}}
         </h1>
-        <div hx-get="{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
+        <div hx-get="{{.BaseURI}}/{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
         {{if .Chat.Messages}}
           <a
               href="{{.BaseURI}}"
@@ -47,10 +47,10 @@
           </a>
         {{end}}
       </header>
-      {{template "messages" .Chat}}
+      {{template "messages" .}}
       <form
         id="prompt"
-        hx-post="{{.Chat.ID}}/branch/{{.Branch.ID}}/message"
+        hx-post="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/message"
         hx-trigger="{{.Keybinds.SendMessage.Value}}"
         hx-vals='js:{
             "prompt": editor.getValue(),
