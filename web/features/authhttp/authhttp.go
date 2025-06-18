@@ -45,7 +45,7 @@ func InitMux(q *db.Queries, loginURI, registerURI, homeURI string) *http.ServeMu
 	m := http.NewServeMux()
 	m.HandleFunc("GET /login", h.getLogin)
 	m.HandleFunc("GET /register", h.getRegister)
-	m.HandleFunc("GET /profile", protectedRoute(jwksClient, jwkStore))
+	m.HandleFunc("GET /profile", h.protectedRoute(jwksClient, jwkStore))
 	return m
 }
 
@@ -85,31 +85,14 @@ func (h AuthHandler) getRegister(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// func (h AuthHandler) getProfile(w http.ResponseWriter, r *http.Request) {
-// 	_, ok := clerk.SessionClaimsFromContext(r.Context())
-// 	if !ok {
-// 		w.WriteHeader(http.StatusUnauthorized)
-// 		w.Write([]byte(`{"access": "unauthorized"}`))
-// 		return
-// 	}
-//
-// 	err := h.t.Render(w, "profile", RegisterRender{
-// 		LoginURI: h.loginURI,
-// 		HomeURI:  h.homeURI,
-// 	})
-//
-// 	if err != nil {
-// 		slog.Error("failed to render PROFILE", "with", err)
-// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-// 		return
-// 	}
-// }
-
 type sessionRefresh struct {
 	JWT string `json:"jwt"`
 }
 
-func protectedRoute(jwksClient *jwks.Client, store JWKStore) func(http.ResponseWriter, *http.Request) {
+// TODO: Use JWK
+// TODO: Call clerkjwt.Verify only once
+// TODO: Rewrite into middleware
+func (h AuthHandler) protectedRoute(jwksClient *jwks.Client, store JWKStore) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the session JWT from the Authorization header
 		sessionCookie, err := r.Cookie("__session")
@@ -150,6 +133,7 @@ func protectedRoute(jwksClient *jwks.Client, store JWKStore) func(http.ResponseW
 				return
 			}
 			req.Header.Add("Content-Type", "application/json")
+			// TODO: Use handler state for SK
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", os.Getenv("CLERK_SECRET_KEY")))
 
 			resp, err := client.Do(req)
@@ -196,7 +180,18 @@ func protectedRoute(jwksClient *jwks.Client, store JWKStore) func(http.ResponseW
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		fmt.Fprintf(w, `{"user_id": "%s", "user_banned": "%t"}`, usr.ID, usr.Banned)
+		slog.Info("fetched user", "vall", usr)
+
+		err = h.t.Render(w, "profile", RegisterRender{
+			LoginURI: h.loginURI,
+			HomeURI:  h.homeURI,
+		})
+
+		if err != nil {
+			slog.Error("failed to render PROFILE", "with", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
