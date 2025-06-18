@@ -18,6 +18,8 @@ export GEMINI_API_KEY=
 export CLERK_SECRET_KEY=
 ```
 
+Set clerk public data in `static/meta.html` (unfortunately we haven't managed to move it into env in time)
+
 Run:
 
 ```bash
