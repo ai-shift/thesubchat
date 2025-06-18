@@ -38,7 +38,7 @@
         <div hx-get="{{.BaseURI}}/{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
         <div  
           id="merge-button-container"
-          hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/merge"
+          hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/merge-status"
           hx-trigger="load, messageStreamFinished"
           hx-swap="outerHTML"
         ></div>

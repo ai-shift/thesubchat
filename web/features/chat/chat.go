@@ -59,7 +59,7 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 	m.HandleFunc("DELETE /{id}", h.deleteChat)
 	m.HandleFunc("POST /{id}/branch/{branchId}/message", h.postUserMessage)
 	m.HandleFunc("GET /{id}/branch/{branchId}/message/stream", h.getMessageStream)
-	m.HandleFunc("GET /{id}/branch/{branchId}/merge", h.getMerge)
+	m.HandleFunc("GET /{id}/branch/{branchId}/merge-status", h.getMergeStatus)
 	m.HandleFunc("GET /{id}/title", h.getTitle)
 	m.HandleFunc("GET /{id}/tags", h.getTags)
 	m.HandleFunc("POST /{id}/tags", h.postTags)
@@ -445,7 +445,7 @@ loop:
 	<-r.Context().Done()
 }
 
-func (h ChatHandler) getMerge(w http.ResponseWriter, r *http.Request) {
+func (h ChatHandler) getMergeStatus(w http.ResponseWriter, r *http.Request) {
 	// Validate data
 	chatID, err := deserID(w, r)
 	var errs []error
