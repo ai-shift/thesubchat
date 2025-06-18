@@ -180,7 +180,7 @@ func (h AuthHandler) protectedRoute(jwksClient *jwks.Client, store JWKStore) fun
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		slog.Info("fetched user", "vall", usr)
+		slog.Info("fetched user", "val", usr)
 
 		err = h.t.Render(w, "profile", RegisterRender{
 			LoginURI: h.loginURI,
