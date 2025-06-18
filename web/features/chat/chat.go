@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -55,7 +56,7 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 	m.HandleFunc("GET /{id}", h.getChat)
 	m.HandleFunc("GET /{id}/branch/{branchId}", h.getChatBranch)
 	m.HandleFunc("DELETE /{id}", h.deleteChat)
-	m.HandleFunc("POST /{id}/message", h.postUserMessage)
+	m.HandleFunc("POST /{id}/branch/{branchId}/message", h.postUserMessage)
 	m.HandleFunc("GET /{id}/message/stream", h.getMessageStream)
 	m.HandleFunc("GET /{id}/title", h.getTitle)
 	m.HandleFunc("GET /{id}/tags", h.getTags)
@@ -88,7 +89,7 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	chat, err := findChat(h.q, id)
+	chat, err := findChat(r.Context(), h.q, id)
 	if err != nil {
 		slog.Error("failed to find chat", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -207,36 +208,44 @@ type ChatMention struct {
 
 func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	// Validate request
+	var errs []error
 	prompt := r.FormValue("prompt")
-
 	if prompt == "" {
-		http.Error(w, "Prompt shouldn't be empty", http.StatusBadRequest)
-		return
+		errs = append(errs, fmt.Errorf("prompt shouldn't be empty"))
 	}
 
 	mentionsJSON := r.FormValue("mentions")
 	mentions := []ChatMention{}
-
 	err := json.Unmarshal([]byte(mentionsJSON), &mentions)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		errs = append(errs, err)
 	}
 
 	id, err := deserID(w, r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		errs = append(errs, err)
+	}
+
+	branchID, err := deserBranchID(w, r)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		http.Error(w, errors.Join(errs...).Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Get chat
-	chat, err := findChat(h.q, id)
+	chat, err := findChat(r.Context(), h.q, id)
 	userMsg := Message{Text: prompt, Role: "user"}
 	var newChatCreated bool
 	switch err {
 	case nil:
 		chat.Messages = append(chat.Messages, userMsg)
+	// TODO: Move to service
 	case sql.ErrNoRows:
+		// Create new chat
 		chat = Chat{
 			Title:    "New Chat",
 			ID:       id,
@@ -249,6 +258,8 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		newChatCreated = true
+
+		// Generate title in background
 		titleCtx := context.Background()
 		go func() {
 			stream := h.titleChan.Alloc(id)
@@ -279,15 +290,25 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mentionedChats := make([]Chat, len(mentions))
+	// Get branch
+	branch, err := findChatBranch(r.Context(), h.q, id, branchID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
+	// Get mentioned chats
+	mentionedChats := make([]Chat, len(mentions))
 	for i, v := range mentions {
-		m, err := findChat(h.q, v.ID)
+		// Find mentioned chat
+		m, err := findChat(r.Context(), h.q, v.ID)
 		if err != nil {
 			slog.Error("failed to find mentioned chat", "err", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Save used mention
 		err = h.q.SaveMention(r.Context(), db.SaveMentionParams{
 			TargetID: v.ID.String(),
 			SourceID: chat.ID.String(),
@@ -297,6 +318,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
+		// Collect
 		mentionedChats[i] = m
 	}
 
@@ -319,9 +341,11 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	}(context.Background(), chat)
 
 	// Redirect to the new page
-	if newChatCreated {
-		slog.Error("redirecting to the created chat")
-		w.Header().Set("HX-Redirect", chat.ID.String())
+	if newChatCreated || len(branch.Messages) == 1 {
+		w.Header().Set(
+			"HX-Redirect",
+			fmt.Sprintf("%s/%s/branch/%s", h.baseURI, chat.ID.String(), branchID.String()),
+		)
 		return
 	}
 

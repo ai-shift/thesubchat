@@ -50,7 +50,7 @@
       {{template "messages" .Chat}}
       <form
         id="prompt"
-        hx-post="{{ .Chat.ID }}/message"
+        hx-post="{{.Chat.ID}}/branch/{{.Branch.ID}}/message"
         hx-trigger="{{.Keybinds.SendMessage.Value}}"
         hx-vals='js:{
             "prompt": editor.getValue(),

@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -28,8 +29,7 @@ type Message struct {
 	Role string
 }
 
-func findChat(q *db.Queries, id uuid.UUID) (Chat, error) {
-	ctx := context.Background()
+func findChat(ctx context.Context, q *db.Queries, id uuid.UUID) (Chat, error) {
 	chat, err := q.FindChat(ctx, id.String())
 	if err != nil {
 		return Chat{}, err
@@ -44,6 +44,31 @@ func findChat(q *db.Queries, id uuid.UUID) (Chat, error) {
 		Title:    chat.Title,
 		Messages: msgs,
 	}, nil
+}
+
+type Branch struct {
+	Messages []Message
+}
+
+func findChatBranch(ctx context.Context, q *db.Queries, chatID uuid.UUID, branchID uuid.UUID) (b Branch, _ error) {
+	msgsBlob, err := q.FindChatBranch(ctx, db.FindChatBranchParams{
+		ID:     branchID.String(),
+		ChatID: chatID.String(),
+	})
+	switch err {
+	case nil:
+		break
+	case sql.ErrNoRows:
+		return b, nil
+	default:
+		return b, err
+	}
+	var msgs []Message
+	err = json.Unmarshal(msgsBlob, &msgs)
+	if err != nil {
+		return b, err
+	}
+	return Branch{Messages: msgs}, nil
 }
 
 func findChatsTitles(q *db.Queries) ([]db.FindChatTitlesRow, error) {
