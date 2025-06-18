@@ -7,7 +7,7 @@ Install required tools:
 
 Setup DB:
 
-[Retrieve DB credentials](https://docs.turso.tech/sdk/go/quickstart)
+[Retrieve DB credentials (only the first step)](https://docs.turso.tech/sdk/go/quickstart)
 
 Set Env vars (can be copy pasted from `.env.example` and sourced):
 ```bash
