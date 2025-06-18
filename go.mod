@@ -5,6 +5,7 @@ go 1.24.3
 require (
 	github.com/clerk/clerk-sdk-go/v2 v2.3.1
 	github.com/firebase/genkit/go v0.5.4
+	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b
 	github.com/google/uuid v1.6.0
 	github.com/tursodatabase/libsql-client-go v0.0.0-20240902231107-85af5b9d094d
@@ -19,7 +20,6 @@ require (
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/coder/websocket v1.8.12 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/goccy/go-yaml v1.17.1 // indirect

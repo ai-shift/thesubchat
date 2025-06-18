@@ -12,8 +12,9 @@ import (
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/clerk/clerk-sdk-go/v2/jwks"
-	"github.com/clerk/clerk-sdk-go/v2/jwt"
+	clerkjwt "github.com/clerk/clerk-sdk-go/v2/jwt"
 	"github.com/clerk/clerk-sdk-go/v2/user"
+	"github.com/go-jose/go-jose/v3/jwt"
 
 	"shellshift/internal/db"
 	"shellshift/internal/templates"
@@ -119,7 +120,7 @@ func protectedRoute(jwksClient *jwks.Client, store JWKStore) func(http.ResponseW
 		sessionToken := sessionCookie.Value
 
 		// Decode the session JWT so that we can find the key ID.
-		unsafeClaims, err := jwt.Decode(r.Context(), &jwt.DecodeParams{
+		unsafeClaims, err := clerkjwt.Decode(r.Context(), &clerkjwt.DecodeParams{
 			Token: sessionToken,
 		})
 		if err != nil {
@@ -129,12 +130,17 @@ func protectedRoute(jwksClient *jwks.Client, store JWKStore) func(http.ResponseW
 		slog.Info("unsafe claims", "val", unsafeClaims)
 
 		// Verify the session
-		claims, err := jwt.Verify(r.Context(), &jwt.VerifyParams{
+		claims, err := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
 			Token: sessionToken,
 		})
-		if err != nil {
-			// handle the error
-			slog.Info("refreshing session")
+		switch err {
+		default:
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		case nil:
+			break
+		case jwt.ErrExpired:
+			slog.Info("refreshing session", "err", err)
 			body := []byte("{}")
 			url := fmt.Sprintf("https://api.clerk.com/v1/sessions/%s/tokens", unsafeClaims.Extra["sid"])
 			client := &http.Client{}
@@ -177,7 +183,7 @@ func protectedRoute(jwksClient *jwks.Client, store JWKStore) func(http.ResponseW
 			sessionCookie.Expires = sessionCookie.Expires.Add(60 * time.Second)
 			http.SetCookie(w, sessionCookie)
 
-			claims, err = jwt.Verify(r.Context(), &jwt.VerifyParams{
+			claims, err = clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
 				Token: out.JWT,
 			})
 			if err != nil {
