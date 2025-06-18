@@ -1,7 +1,4 @@
-#+title: Thesubchat
-#+author: aishift
-
-* How to run
+# How to run
 
 Install required tools:
 - [Go](https://go.dev/doc/install)
@@ -29,30 +26,24 @@ make migrate-up
 go run ./cmd/server/main.go
 ```
 
-* Architecture
+# Architecture
+- Stack:
+    - [Go](https://go.dev/)
+    - [HTMX](https://htmx.org/)
+    - [Turso](https://turso.tech/)
+    - [geni](https://github.com/emilpriver/geni)
+    - [ace.js](https://ace.c9.io/)
+    - [cytoscape.js](https://ivis-at-bilkent.github.io/cytoscape.js-fcose/demo/demo-compound.html)
 
-   - *Stack:*
-     - Go
-     - [[https://htmx.org/][HTMX]]
-     - [[https://turso.tech/][Turso]]
-     - [[https://github.com/emilpriver/geni][geni]]
-   - *Used libraries:*
-     - [[https://github.com/golang-jwt/jwt][golang-jwt]]
-     - [[https://github.com/golang/oauth2][oauth2]]
-     - [[https://ace.c9.io/][ace.js]]
-     - [[https://addshore.com/2018/03/gitgraph-js-and-codepen-io-for-git-visualization/][gitgraph.js]]
-     - [[https://github.com/go-git/go-git][golang git]]
-     - [[https://ivis-at-bilkent.github.io/cytoscape.js-fcose/demo/demo-compound.html][cytoscape.js]]
-
-** Services
-*** Auth
+## Services
+### Auth
 
 Use cases:
 
 1. Login
 2. Logout
 
-*** Chat
+### Chat
 
 Use cases:
 
@@ -66,14 +57,14 @@ Use cases:
 8. Open in editor any added file / clipboard
 9. Mention other chat
 
-*** Branch
+### Branch
 
 Use cases:
 
 1. Merge into main
 2. Fork to the new chat
 
-*** VCS
+### VCS
 
 Use cases:
 
@@ -83,7 +74,7 @@ Use cases:
 4. Add / edit tags
 5. Connect chats
 
-*** Graph
+### Graph
 
 Use cases:
 
