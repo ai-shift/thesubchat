@@ -3,7 +3,13 @@ package authhttp
 import (
 	"log/slog"
 	"net/http"
-	"shellshift/internal/auth"
+	"strings"
+
+	"github.com/clerk/clerk-sdk-go/v2"
+	clerkhttp "github.com/clerk/clerk-sdk-go/v2/http"
+	"github.com/clerk/clerk-sdk-go/v2/jwt"
+	"github.com/clerk/clerk-sdk-go/v2/user"
+
 	"shellshift/internal/db"
 	"shellshift/internal/templates"
 )
@@ -26,10 +32,16 @@ func InitMux(q *db.Queries, loginURI, registerURI, homeURI string) *http.ServeMu
 	}
 
 	m := http.NewServeMux()
-
+	protectedHandler := http.HandlerFunc(h.getProfile)
 	m.HandleFunc("GET /login", h.getLogin)
 	m.HandleFunc("GET /register", h.getRegister)
-	m.Handle("GET /profile", auth.ProtectedRoute(h.getProfile))
+	m.Handle("GET /profile", ProtectedRoute(h.getProfile))
+	m.Handle(
+		"GET /clerk",
+		clerkhttp.RequireHeaderAuthorization(
+			clerkhttp.AuthorizationJWTExtractor(AuthorizationOrCookieJWTExtractor),
+		)(protectedHandler),
+	)
 	return m
 }
 
@@ -70,6 +82,13 @@ func (h AuthHandler) getRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h AuthHandler) getProfile(w http.ResponseWriter, r *http.Request) {
+	_, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"access": "unauthorized"}`))
+		return
+	}
+
 	err := h.t.Render(w, "profile", RegisterRender{
 		LoginURI: h.loginURI,
 		HomeURI:  h.homeURI,
@@ -80,4 +99,51 @@ func (h AuthHandler) getProfile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func ProtectedRoute(next func(http.ResponseWriter, *http.Request)) http.Handler {
+
+	inner := func(w http.ResponseWriter, r *http.Request) {
+		session, err := r.Cookie("__session")
+		if err != nil {
+			http.Error(w, "Session cookie not found", http.StatusUnauthorized)
+			return
+		}
+
+		// Verify the session
+		claims, err := jwt.Verify(r.Context(), &jwt.VerifyParams{
+			Token: session.Value,
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		usr, err := user.Get(r.Context(), claims.Subject)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			slog.Error("Failed to get the user", "with", err)
+			return
+		}
+
+		slog.Info("User found", "user", usr)
+
+		next(w, r)
+	}
+
+	return clerkhttp.WithHeaderAuthorization()(http.HandlerFunc(inner))
+}
+
+func AuthorizationOrCookieJWTExtractor(r *http.Request) string {
+	authorization := strings.TrimSpace(r.Header.Get("Authorization"))
+	authorization = strings.TrimPrefix(authorization, "Bearer ")
+	if authorization == "" {
+		sessionCookie, err := r.Cookie("__session")
+		if err != nil {
+			authorization = ""
+		} else {
+			authorization = sessionCookie.Value
+		}
+	}
+	return authorization
 }
