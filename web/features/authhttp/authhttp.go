@@ -2,6 +2,7 @@ package authhttp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -45,7 +46,7 @@ func InitMux(q *db.Queries, loginURI, registerURI, homeURI string) *http.ServeMu
 	m := http.NewServeMux()
 	m.HandleFunc("GET /login", h.getLogin)
 	m.HandleFunc("GET /register", h.getRegister)
-	m.HandleFunc("GET /profile", h.protectedRoute(jwksClient, jwkStore))
+	m.HandleFunc("GET /profile", h.getProfile)
 	return m
 }
 
@@ -85,26 +86,44 @@ func (h AuthHandler) getRegister(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h AuthHandler) getProfile(w http.ResponseWriter, r *http.Request){
+		err := h.t.Render(w, "profile", RegisterRender{
+			LoginURI: h.loginURI,
+			HomeURI:  h.homeURI,
+		})
+
+		if err != nil {
+			slog.Error("failed to render PROFILE", "with", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+}
+
+type ProtectionMiddleware struct {
+  clerkSK string
+  jwk *clerk.JSONWebKey
+  jwkClient *jwks.Client
+}
+
 type sessionRefresh struct {
 	JWT string `json:"jwt"`
 }
 
 // TODO: Use JWK
-// TODO: Call clerkjwt.Verify only once
-// TODO: Rewrite into middleware
-func (h AuthHandler) protectedRoute(jwksClient *jwks.Client, store JWKStore) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Get the session JWT from the Authorization header
+func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
+  return func(w http.ResponseWriter, r *http.Request) {
+
+
+  // Get the session JWT from the Authorization header
 		sessionCookie, err := r.Cookie("__session")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
-		sessionToken := sessionCookie.Value
 
-		// Decode the session JWT so that we can find the key ID.
+    // Decode the session JWT so that we can find the key ID.
 		unsafeClaims, err := clerkjwt.Decode(r.Context(), &clerkjwt.DecodeParams{
-			Token: sessionToken,
+			Token: sessionCookie.Value,
 		})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -112,10 +131,8 @@ func (h AuthHandler) protectedRoute(jwksClient *jwks.Client, store JWKStore) fun
 		}
 		slog.Info("unsafe claims", "val", unsafeClaims)
 
-		// Verify the session
-		claims, err := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
-			Token: sessionToken,
-		})
+    // Refresh token in needed
+    _, err = jwt.ParseSigned(sessionCookie.Value)
 		switch err {
 		default:
 			http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -133,8 +150,7 @@ func (h AuthHandler) protectedRoute(jwksClient *jwks.Client, store JWKStore) fun
 				return
 			}
 			req.Header.Add("Content-Type", "application/json")
-			// TODO: Use handler state for SK
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", os.Getenv("CLERK_SECRET_KEY")))
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", m.clerkSK))
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -162,60 +178,41 @@ func (h AuthHandler) protectedRoute(jwksClient *jwks.Client, store JWKStore) fun
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			slog.Info("refreshed session", "body", out)
 			sessionCookie.Value = out.JWT
-			sessionCookie.Expires = sessionCookie.Expires.Add(60 * time.Second)
+			sessionCookie.Expires = time.Now().Add(60 * time.Second)
 			http.SetCookie(w, sessionCookie)
+		}
 
-			claims, err = clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
-				Token: out.JWT,
+    if m.jwk == nil {
+      jwk, err := clerkjwt.GetJSONWebKey(r.Context(), &clerkjwt.GetJSONWebKeyParams{
+				KeyID:      unsafeClaims.KeyID,
+				JWKSClient: m.jwkClient,
+			})
+
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusUnauthorized)
+				return
+			}
+      m.jwk = jwk
+    }
+
+    claims, err := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
+      Token: sessionCookie.Value,
+      JWK: m.jwk,
 			})
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-		}
 
-		usr, err := user.Get(r.Context(), claims.Subject)
+    usr, err := user.Get(r.Context(), claims.Subject)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		slog.Info("fetched user", "val", usr)
 
-		err = h.t.Render(w, "profile", RegisterRender{
-			LoginURI: h.loginURI,
-			HomeURI:  h.homeURI,
-		})
+    r = r.WithContext(context.WithValue(r.Context(), "user_id", usr.ID))
 
-		if err != nil {
-			slog.Error("failed to render PROFILE", "with", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-}
-
-// Sample interface for JSON Web Key storage.
-// Implementation may vary.
-type JWKStore interface {
-	GetJWK() *clerk.JSONWebKey
-	SetJWK(*clerk.JSONWebKey)
-}
-
-type MemJWKStore struct {
-	key *clerk.JSONWebKey
-}
-
-func (s MemJWKStore) GetJWK() *clerk.JSONWebKey {
-	return s.key
-}
-
-func (s *MemJWKStore) SetJWK(key *clerk.JSONWebKey) {
-	s.key = key
-}
-
-func NewJWKStore() JWKStore {
-	// Implementation may vary. This can be an
-	// in-memory store, database, caching layer,...
-	return &MemJWKStore{}
+    next(w, r)
+  }
 }
