@@ -396,14 +396,13 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	id, err := deserID(w, r)
+	branchID, _, err := deserBranchID(w, r)
 	if err != nil {
-		slog.Error("got invalid chat id", "val", id)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	stream, ok := h.msgChan.Get(id)
+	stream, ok := h.msgChan.Get(branchID)
 	if !ok {
 		sse.Send(w, sse.Event{
 			Type: "finished",
