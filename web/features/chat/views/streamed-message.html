@@ -12,5 +12,8 @@
         behavior: "smooth",
         block: "end",
       });
+    document.addEventListener("htmx:sseClose", (e) => {
+      htmx.trigger('#merge-button-container', 'messageStreamFinished');
+    })
   </script>
 {{end}}
