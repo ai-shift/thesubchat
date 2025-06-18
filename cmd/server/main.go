@@ -22,8 +22,8 @@ func main() {
 	q := db.New(conn)
 	m.Handle(fmt.Sprintf("%s/", chatURI), http.StripPrefix(chatURI, chat.InitMux(q, chatURI, graphURI)))
 	m.Handle(fmt.Sprintf("%s/", graphURI), http.StripPrefix(graphURI, graph.InitMux(q, chatURI)))
-	slog.Info("site running on port 3000...")
-	if err := http.ListenAndServe(":3000", m); err != nil {
+	slog.Info("site running on port 42069...")
+	if err := http.ListenAndServe(":42069", m); err != nil {
 		slog.Error("serving finished with", "err", err.Error())
 	}
 }
