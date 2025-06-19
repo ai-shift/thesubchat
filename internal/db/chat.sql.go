@@ -61,6 +61,28 @@ func (q *Queries) FindChat(ctx context.Context, id string) (FindChatRow, error) 
 	return i, err
 }
 
+const findChatBranch = `-- name: FindChatBranch :one
+SELECT
+    messages
+FROM
+    chat_branch
+WHERE
+    chat_id = ?
+    AND id = ?
+`
+
+type FindChatBranchParams struct {
+	ChatID string
+	ID     string
+}
+
+func (q *Queries) FindChatBranch(ctx context.Context, arg FindChatBranchParams) ([]byte, error) {
+	row := q.db.QueryRowContext(ctx, findChatBranch, arg.ChatID, arg.ID)
+	var messages []byte
+	err := row.Scan(&messages)
+	return messages, err
+}
+
 const findChatTitles = `-- name: FindChatTitles :many
 SELECT
     id,
@@ -186,6 +208,29 @@ type SaveMentionParams struct {
 
 func (q *Queries) SaveMention(ctx context.Context, arg SaveMentionParams) error {
 	_, err := q.db.ExecContext(ctx, saveMention, arg.TargetID, arg.SourceID)
+	return err
+}
+
+const saveOrUpdateChatBranchMessages = `-- name: SaveOrUpdateChatBranchMessages :exec
+INSERT INTO
+    chat_branch (id, chat_id, messages)
+VALUES
+    (?, ?, ?) ON conflict (id, chat_id) DO
+UPDATE
+SET
+    id = excluded.id,
+    chat_id = excluded.chat_id,
+    messages = excluded.messages
+`
+
+type SaveOrUpdateChatBranchMessagesParams struct {
+	ID       string
+	ChatID   string
+	Messages []byte
+}
+
+func (q *Queries) SaveOrUpdateChatBranchMessages(ctx context.Context, arg SaveOrUpdateChatBranchMessagesParams) error {
+	_, err := q.db.ExecContext(ctx, saveOrUpdateChatBranchMessages, arg.ID, arg.ChatID, arg.Messages)
 	return err
 }
 

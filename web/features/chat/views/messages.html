@@ -6,9 +6,15 @@
        messagesDiv.scrollTop = messagesDiv.scrollHeight;
      })
     </script>
-    {{range .Messages}}
+    {{$messages := .Chat.Messages}}
+    {{if .Branch.Messages }}
+      {{$messages = .Branch.Messages}}
+    {{end}}
+
+    {{range $messages}}
       {{block "message" .}}{{end}}
     {{end}}
+
     {{if .MessageGenerating}}
       {{block "streamed-message" .}}{{end}}
     {{end}}

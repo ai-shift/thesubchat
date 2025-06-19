@@ -75,3 +75,23 @@ DELETE FROM
     chat
 WHERE
     id = ?;
+
+-- name: FindChatBranch :one
+SELECT
+    messages
+FROM
+    chat_branch
+WHERE
+    chat_id = ?
+    AND id = ?;
+
+-- name: SaveOrUpdateChatBranchMessages :exec
+INSERT INTO
+    chat_branch (id, chat_id, messages)
+VALUES
+    (?, ?, ?) ON conflict (id, chat_id) DO
+UPDATE
+SET
+    id = excluded.id,
+    chat_id = excluded.chat_id,
+    messages = excluded.messages;

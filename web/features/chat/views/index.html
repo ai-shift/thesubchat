@@ -20,13 +20,19 @@
         </a>
         <h1>
           {{if .TitleGenerating}}
-            <span hx-get="{{.Chat.ID}}/title" hx-trigger="load"></span>
+            <span hx-get="{{.BaseURI}}/{{.Chat.ID}}/title" hx-trigger="load"></span>
           {{else}}
             {{.Chat.Title}}
           {{end}}
         </h1>
-        <div hx-get="{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
-        {{if .Chat.Messages}}
+        <div hx-get="{{.BaseURI}}/{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
+        <div  
+          id="merge-button-container"
+          hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/merge-status"
+          hx-trigger="load, messageStreamFinished"
+          hx-swap="outerHTML"
+        ></div>
+        {{if or .Chat.Messages .Branch.Messages}}
           <a
               href="{{.BaseURI}}"
               class="bg-blue-300 p-2"
@@ -39,11 +45,11 @@
       </header>
       <div class="flex flex-1 items-strech overflow-y-auto">
           <div hx-get="{{.BranchURI}}" hx-swap="outerHTML" hx-trigger="load"></div>
-          {{template "messages" .Chat}}
+          {{template "messages" .}}
       </div>
       <form
         id="prompt"
-        hx-post="{{ .Chat.ID }}/message"
+        hx-post="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/message"
         hx-trigger="{{.Keybinds.SendMessage.Value}}"
         hx-vals='js:{
             "prompt": editor.getValue(),
