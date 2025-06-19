@@ -14,7 +14,7 @@
             </style>
         </head>
         <body class="grid grid-cols-[1fr_3fr] grid-rows-[auto_1fr] h-[100dvh]">
-            <header class="col-span-2 px-2 py-1 flex justify-between items-center bg-gray-200">
+            <header class="col-span-2 px-2 py-1 flex justify-between items-center bg-white border-b-2 border-gray-300 shadow-[0_2px_0px_0px_#9ca3af] relative z-10">
                 <div class="flex items-center gap-4">
                     <div class="flex items-center gap-3">
                         <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 border-2 border-blue-800 shadow-[0_2px_0px_0px_#1e40af] flex items-center justify-center">
@@ -51,7 +51,7 @@
                   hx-swap="outerHTML"
                 ></div>
             </header>
-                <aside>
+            <aside class="bg-white border-r-2 border-gray-300 shadow-[2px_0_0px_0px_#9ca3af]">
                     <div
                       hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch"
                       hx-trigger="load"
@@ -82,8 +82,8 @@
                           editor.setValue()"
                       class="relative flex items-center justify-center p-4 pb-10"
                     >
-                        <div class="flex gap-3 w-full max-w-[60rem] border-2 px-3 py-2 text-gray-800 border-gray-300 min-h-[80px] max-h-40 ">
-                            <div class="h-full w-full relative p-3 bg-white">
+                        <div class="flex gap-3 w-full max-w-[60rem] px-3 py-2 text-gray-800 min-h-[80px] max-h-40 ">
+                            <div class="h-full w-full relative p-3 bg-white border-2 border-gray-300">
                                 <div
                                   id="editor"
                                   hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
