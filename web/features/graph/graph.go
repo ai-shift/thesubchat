@@ -26,7 +26,7 @@ func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, chatURI string
 	}
 
 	m := http.NewServeMux()
-	m.HandleFunc("GET /", h.getGraph)
+	m.HandleFunc("GET /", protector.Protect(h.getGraph))
 	return m
 }
 
