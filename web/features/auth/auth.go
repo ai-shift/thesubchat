@@ -23,20 +23,23 @@ import (
 type AuthHandler struct {
 	t       *templates.Templates
 	q       *db.Queries
+	clerkSK string
 	baseURI string
 	homeURI string
 }
 
-func InitMux(q *db.Queries, protector *ProtectionMiddleware, baseURI, homeURI string) *http.ServeMux {
+func InitMux(q *db.Queries, protector *ProtectionMiddleware, clerkSK, baseURI, homeURI string) *http.ServeMux {
 	h := AuthHandler{
 		t:       templates.New("web/features/auth/views/*.html"),
 		q:       q,
+		clerkSK: clerkSK,
 		baseURI: baseURI,
 		homeURI: homeURI,
 	}
 
 	m := http.NewServeMux()
 	m.HandleFunc("GET /login", h.getLogin)
+	m.HandleFunc("GET /logout", protector.Protect(h.getLogout))
 	m.HandleFunc("GET /register", h.getRegister)
 	m.HandleFunc("GET /profile", protector.Protect(h.getProfile))
 	return m
@@ -58,6 +61,49 @@ func (h AuthHandler) getLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func (h AuthHandler) getLogout(w http.ResponseWriter, r *http.Request) {
+	c, err := r.Cookie("__session")
+	redirect := func() {
+		http.Redirect(w, r, fmt.Sprintf("%s/login", h.baseURI), http.StatusMovedPermanently)
+	}
+
+	if err != nil {
+		redirect()
+		return
+	}
+
+	unsafeClaims, err := clerkjwt.Decode(r.Context(), &clerkjwt.DecodeParams{
+		Token: c.Value,
+	})
+	if err != nil {
+		slog.Error("failed to decode JWT claims")
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	url := fmt.Sprintf("https://api.clerk.com/v1/sessions/%s/revoke", unsafeClaims.Extra["sid"])
+	client := &http.Client{}
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte{}))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", h.clerkSK))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	c.Value = ""
+	c.MaxAge = -1
+	http.SetCookie(w, c)
+
+	redirect()
 }
 
 type RegisterRender struct {
@@ -193,7 +239,7 @@ func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.
 
 			if resp.StatusCode >= 400 {
 				slog.Info("failed to refresh token", "status", resp.StatusCode, "body", string(body), "url", url)
-				http.Error(w, string(body), resp.StatusCode)
+				http.Redirect(w, r, fmt.Sprintf("%s/login", m.baseURI), http.StatusMovedPermanently)
 				return
 			}
 

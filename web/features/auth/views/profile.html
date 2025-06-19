@@ -5,16 +5,20 @@
             <title>Shell>> chat</title>
             {{block "meta" .}}{{end}}
         </head>
-        <body class="h-[100dvh] flex justify-center items-center">
-            <div id="app"></div>
+        <body class="relative h-[100dvh] flex justify-center items-center">
+            <div id="app" class="relative">
+               <div id="user-profile"></div>
+               <a
+                 href="{{.BaseURI}}/logout"
+                 class="absolute bottom-5 right-5 bg-red-400 p-2 text-white"
+               >
+                   LOGOUT
+               </a>
+            </div>
         </body>
         <script>
          window.addEventListener('load', async function () {
            await Clerk.load()
-
-           document.getElementById('app').innerHTML = `
-               <div id="user-profile"></div>
-           `
 
            const userProfileDiv = document.getElementById('user-profile')
 
