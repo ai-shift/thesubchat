@@ -19,6 +19,9 @@
     Main
   </a>
   {{range .Items}}
+    {{if not .Meta.BranchID}}
+      {{continue}}
+    {{end}}
     <a
       class="block"
       href="{{$.BaseURI}}/{{$.ChatID}}/branch/{{.Meta.BranchID}}"
