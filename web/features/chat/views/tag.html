@@ -1,19 +1,17 @@
 {{define "tag"}}
-    <div
-      class="flex bg-gradient-to-r from-yellow-300 to-yellow-400 text-gray-800 p-1.5 text-sm font-mono font-bold border-2 border-yellow-600 uppercase shadow-[0_1px_0px_0px_#ca8a04]"
-      id="tag-{{.Name}}"
+
+    <button
+      hx-delete="{{.ChatID}}/tags"
+      hx-target="this"
+      hx-swap="outerHTML"
+      vals="{tag: {{.Name}}}"
+      class="cursor-pointer gap-1 items-center flex bg-gradient-to-r from-yellow-300 to-yellow-400 text-gray-800 p-1.5 text-sm font-mono font-bold border-2 border-yellow-600 uppercase shadow-[0_1px_0px_0px_#ca8a04]"
     >
-        <button
-          hx-delete="{{.ChatID}}/tags"
-          hx-target="#tag-{{.Name}}"
-          hx-swap="delete"
-          class="flex cursor-pointer gap-1 items-center"
-        >
         {{.Name}}
         <i class="h-5 stroke-red-600" data-lucide="x"></i>
     </button>
     <script>
+     console.log({{.ChatID}})
      lucide.createIcons();
     </script>
-  </div>
 {{end}}
