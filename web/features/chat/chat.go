@@ -86,8 +86,8 @@ type ChatViewData struct {
 	Keybinds          web.KeybindsTable
 	BaseURI           string
 	GraphURI          string
-	BranchURI         string
 	MessageGenerating bool
+	Empty             bool
 }
 
 // TODO: Add streaming message to new chat response
@@ -230,6 +230,7 @@ func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 		Keybinds:   web.Keybinds,
 		BaseURI:    h.baseURI,
 		GraphURI:   h.graphURI,
+		Empty:      true,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())

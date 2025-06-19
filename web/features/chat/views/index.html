@@ -1,5 +1,4 @@
 {{ define "index" }}
-{{$hasMessages := or .Chat.Messages .Branch.Messages}}
   <!DOCTYPE html>
   <html lang="en">
     <head>
@@ -33,7 +32,7 @@
           hx-trigger="load, messageStreamFinished"
           hx-swap="outerHTML"
         ></div>
-        {{if $hasMessages}}
+        {{if not .Empty}}
           <a
               href="{{.BaseURI}}"
               class="bg-blue-300 p-2"
@@ -78,7 +77,7 @@
               </div>
               <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
           </div>
-          {{if $hasMessages}}
+          {{if not .Empty}}
             <button 
               class="absolute bottom-2 left-2"
               hx-delete="{{.Chat.ID}}"
