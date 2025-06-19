@@ -60,6 +60,7 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 	m.HandleFunc("POST /{id}/branch/{branchId}/message", h.postUserMessage)
 	m.HandleFunc("GET /{id}/branch/{branchId}/message/stream", h.getMessageStream)
 	m.HandleFunc("GET /{id}/branch/{branchId}/merge-status", h.getMergeStatus)
+	m.HandleFunc("GET /{id}/branch/{branchId}/merge", h.getMerge)
 	m.HandleFunc("GET /{id}/title", h.getTitle)
 	m.HandleFunc("GET /{id}/tags", h.getTags)
 	m.HandleFunc("POST /{id}/tags", h.postTags)
@@ -472,12 +473,69 @@ func (h ChatHandler) getMergeStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.templates.Render(w, "merge-button", nil)
+	err = h.templates.Render(w, "merge-button", mergeButtonView{BranchID: branch.ID.String()})
 	if err != nil {
 		slog.Error("failed to render tempalte", "with", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+type mergeButtonView struct {
+	BranchID string
+}
+
+func (h ChatHandler) getMerge(w http.ResponseWriter, r *http.Request) {
+	// Validate data
+	chatID, err := deserID(w, r)
+	var errs []error
+	if err != nil {
+		errs = append(errs, err)
+	}
+	// Branch param always exists because of routing
+	branchID, _, err := deserBranchID(w, r)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		http.Error(w, errors.Join(errs...).Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Find branch
+	branch, err := findChatBranch(r.Context(), h.q, chatID, branchID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	// TODO: Decompose into separate function (look `getMergeStatus`)
+	if len(branch.Messages) < 2 {
+		http.Error(w, "Branch should countain at least 2 messages", http.StatusBadRequest)
+		return
+	}
+
+	// Build merge items
+	items := make([]mergeViewItem, len(branch.Messages))
+	for i, msg := range branch.Messages {
+		items[i] = mergeViewItem{
+			ID:       i,
+			Message:  renderMessage(msg),
+			Selected: i == 0 || i == len(branch.Messages)-1,
+		}
+	}
+
+	// Render tempalte
+	if err := h.templates.Render(w, "merge", items); err != nil {
+		slog.Error("failed to render tempalte", "with", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+type mergeViewItem struct {
+	ID       int
+	Message  HTMLMessage
+	Selected bool
 }
 
 type ChatTags struct {

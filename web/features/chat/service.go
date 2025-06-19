@@ -216,6 +216,13 @@ func renderMessages(chat Chat) []HTMLMessage {
 	return htmlMessages
 }
 
+func renderMessage(msg Message) HTMLMessage {
+	return HTMLMessage{
+		Role: msg.Role,
+		Text: markdownToHTML(msg.Text),
+	}
+}
+
 func markdownToHTML(markdownStr string) template.HTML {
 	extentions := parser.CommonExtensions | parser.MathJax | parser.SuperSubscript | parser.AutoHeadingIDs
 

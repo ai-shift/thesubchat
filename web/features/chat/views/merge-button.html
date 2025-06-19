@@ -1,3 +1,6 @@
 {{define "merge-button"}}
-  <button>Merge</button>
+  <button
+      hx-get="{{.BranchID}}/merge"
+      hx-target="#messages"
+    >Merge</button>
 {{end}}
