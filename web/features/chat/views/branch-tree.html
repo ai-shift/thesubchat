@@ -21,10 +21,10 @@
   {{range .Items}}
     <a
       class="block"
-      href="{{$.BaseURI}}/{{$.ChatID}}/branch/{{.BranchID}}"
-      :class="getBranchIdFromURL() === '{{.BranchID}}' ? 'active-branch' : ''"
+      href="{{$.BaseURI}}/{{$.ChatID}}/branch/{{.Meta.BranchID}}"
+      :class="getBranchIdFromURL() === '{{.Meta.BranchID}}' ? 'active-branch' : ''"
     >
-      {{.Title}}
+      {{.Action}} - {{.Meta.BranchID}}
     </a>
   {{end}}
 </div>

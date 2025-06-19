@@ -175,34 +175,18 @@ func (h ChatHandler) getBranches(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	branches, err := h.q.FindChatBranches(r.Context(), chatID.String())
-	switch err {
-	case sql.ErrNoRows:
-		fallthrough
-	case nil:
-		break
-	default:
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	log, err := h.q.FindChatLog(r.Context(), chatID.String())
-	switch err {
-	case sql.ErrNoRows:
-		fallthrough
-	case nil:
-		break
-	default:
+	log, err := findChatLog(r.Context(), h.q, chatID)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	slog.Info("found chat log", "length", len(log))
 
-	items := make([]branchTreeViewItem, len(branches))
-	for i, b := range branches {
+	items := make([]branchTreeViewItem, len(log))
+	for i, l := range log {
 		items[i] = branchTreeViewItem{
-			Title:    fmt.Sprintf("Branch %d", i),
-			BranchID: b,
+			Meta:   l.Meta,
+			Action: l.Action,
 		}
 	}
 
@@ -225,9 +209,8 @@ type branchTreeView struct {
 }
 
 type branchTreeViewItem struct {
-	Title    string
-	BranchID string
-	Action   string
+	Meta   ChatLogger
+	Action string
 }
 
 func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
@@ -362,6 +345,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		err = saveChatLog(r.Context(), h.q, chat.ID, LogBranchCreated{
+			BranchID:         branch.ID.String(),
 			OriginMessageIdx: len(chat.Messages) - 1,
 		})
 		if err != nil {
@@ -667,6 +651,7 @@ func (h ChatHandler) postMerge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = saveChatLog(r.Context(), h.q, chatID, LogBranchMerged{
+		BranchID:           branch.ID.String(),
 		MergedAmount:       len(toMerge),
 		MergedAtMessageIdX: len(chat.Messages) - 1,
 	})
