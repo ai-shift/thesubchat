@@ -58,7 +58,8 @@
         id="prompt"
         hx-post="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/message"
         hx-trigger="{{.Keybinds.SendMessage.Value}}, submit"
-        hx-indicator="#loader"
+        hx-indicator="#formLoader"
+        hx-disabled-elt="button"
         hx-vals='js:{
             "prompt": editor.getValue(),
             "mentions": JSON.stringify(mentionedChats.map(mention => mention.chat))
@@ -66,7 +67,7 @@
         hx-target="#messages"
         hx-swap="beforeend"
         hx-on::after-request="
-            if(event.detail.successful) this.reset()
+        if(event.detail.successful) this.reset()
             editor.setValue()"
         class="relative flex items-center justify-center bg-gray-300 p-4 pb-10"
       >
@@ -77,8 +78,11 @@
                 hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
                 class="h-full w-full relative"></div>
           </div>
-            <button type="sumbit" class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500">
-              Send
+          <button id="formLoader" type="sumbit" class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500">
+              <span class="hide-with-request">Send</span>
+              <div  class="h-10 indicator">
+                  {{template "indicator"}}
+              </div>
           </button>
       </div>
       {{if .Chat.Messages}}
