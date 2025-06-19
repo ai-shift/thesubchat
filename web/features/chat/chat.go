@@ -10,11 +10,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"shellshift/internal/db"
-	"shellshift/internal/sse"
-	"shellshift/internal/templates"
-	"shellshift/web/features/auth"
-	"shellshift/web/features/chat/textchan"
 	"slices"
 	"strings"
 
@@ -22,20 +17,25 @@ import (
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/google/uuid"
 
+	"shellshift/internal/db"
+	"shellshift/internal/sse"
+	"shellshift/internal/templates"
 	"shellshift/web"
+	"shellshift/web/features/auth"
+	"shellshift/web/features/chat/textchan"
 )
 
 type ChatHandler struct {
 	templates *templates.Templates
-	q         *db.Queries
 	g         *genkit.Genkit
 	msgChan   *textchan.TextChan
 	titleChan *textchan.TextChan
 	baseURI   string
 	graphURI  string
+	db        *db.Factory
 }
 
-func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, baseURI, graphURI string) *http.ServeMux {
+func InitMux(dbF *db.Factory, protector *auth.ProtectionMiddleware, baseURI, graphURI string) *http.ServeMux {
 	ctx := context.Background()
 	g, err := genkit.Init(ctx,
 		genkit.WithPlugins(&googlegenai.GoogleAI{}),
@@ -47,28 +47,28 @@ func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, baseURI, graph
 
 	h := ChatHandler{
 		templates: templates.New("web/features/chat/views/*.html"),
-		q:         q,
 		g:         g,
 		msgChan:   textchan.New(),
 		titleChan: textchan.New(),
 		baseURI:   baseURI,
 		graphURI:  graphURI,
+		db:        dbF,
 	}
 	m := http.NewServeMux()
-	m.HandleFunc("GET /", h.getEmptyChat)
-	m.HandleFunc("GET /{id}", h.getChat)
-	m.HandleFunc("DELETE /{id}", h.deleteChat)
-	m.HandleFunc("GET /{id}/branch", h.getBranches)
-	m.HandleFunc("GET /{id}/branch/{branchId}", h.getChat)
-	m.HandleFunc("POST /{id}/branch/{branchId}/message", h.postUserMessage)
-	m.HandleFunc("GET /{id}/branch/{branchId}/message/stream", h.getMessageStream)
-	m.HandleFunc("GET /{id}/branch/{branchId}/merge-status", h.getMergeStatus)
-	m.HandleFunc("GET /{id}/branch/{branchId}/merge", h.getMerge)
-	m.HandleFunc("POST /{id}/branch/{branchId}/merge", h.postMerge)
-	m.HandleFunc("GET /{id}/title", h.getTitle)
-	m.HandleFunc("GET /{id}/tags", h.getTags)
-	m.HandleFunc("POST /{id}/tags", h.postTags)
-	m.HandleFunc("DELETE /{id}/tags", h.deleteTags)
+	m.HandleFunc("GET /", protector.Protect(h.getEmptyChat))
+	m.HandleFunc("GET /{id}", protector.Protect(h.getChat))
+	m.HandleFunc("DELETE /{id}", protector.Protect(h.deleteChat))
+	m.HandleFunc("GET /{id}/branch", protector.Protect(h.getBranches))
+	m.HandleFunc("GET /{id}/branch/{branchId}", protector.Protect(h.getChat))
+	m.HandleFunc("POST /{id}/branch/{branchId}/message", protector.Protect(h.postUserMessage))
+	m.HandleFunc("GET /{id}/branch/{branchId}/message/stream", protector.Protect(h.getMessageStream))
+	m.HandleFunc("GET /{id}/branch/{branchId}/merge-status", protector.Protect(h.getMergeStatus))
+	m.HandleFunc("GET /{id}/branch/{branchId}/merge", protector.Protect(h.getMerge))
+	m.HandleFunc("POST /{id}/branch/{branchId}/merge", protector.Protect(h.postMerge))
+	m.HandleFunc("GET /{id}/title", protector.Protect(h.getTitle))
+	m.HandleFunc("GET /{id}/tags", protector.Protect(h.getTags))
+	m.HandleFunc("POST /{id}/tags", protector.Protect(h.postTags))
+	m.HandleFunc("DELETE /{id}/tags", protector.Protect(h.deleteTags))
 	return m
 }
 
@@ -102,22 +102,28 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	q, err := h.getQueries(w, r)
+	if err != nil {
+		return
+	}
+
 	var branch Branch
 	if exists {
-		branch, err = findChatBranch(r.Context(), h.q, id, branchID)
+		branch, err = findChatBranch(r.Context(), q, id, branchID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	} else {
 		branch = Branch{ID: uuid.New()}
 	}
-	chat, err := findChat(r.Context(), h.q, id)
+	chat, err := findChat(r.Context(), q, id)
 	if err != nil {
 		slog.Error("failed to find chat", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	chatTitles, err := findChatsTitles(h.q)
+	chatTitles, err := findChatsTitles(q)
 
 	if err != nil {
 		slog.Error("failed to find chat titles", "err", err.Error())
@@ -154,8 +160,13 @@ func (h ChatHandler) deleteChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	q, err := h.getQueries(w, r)
+	if err != nil {
+		return
+	}
+
 	// Delete chat
-	err = h.q.DeleteChat(r.Context(), id.String())
+	err = q.DeleteChat(r.Context(), id.String())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -172,7 +183,12 @@ func (h ChatHandler) getBranches(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	log, err := findChatLog(r.Context(), h.q, chatID)
+	q, err := h.getQueries(w, r)
+	if err != nil {
+		return
+	}
+
+	log, err := findChatLog(r.Context(), q, chatID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -225,7 +241,12 @@ type branchTreeViewItem struct {
 }
 
 func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
-	chatTitles, err := findChatsTitles(h.q)
+	q, err := h.getQueries(w, r)
+	if err != nil {
+		return
+	}
+
+	chatTitles, err := findChatsTitles(q)
 	if err != nil {
 		slog.Error("failed to find chat titles", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -286,8 +307,13 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	q, err := h.getQueries(w, r)
+	if err != nil {
+		return
+	}
+
 	// Get chat
-	chat, err := findChat(r.Context(), h.q, id)
+	chat, err := findChat(r.Context(), q, id)
 	userMsg := Message{Text: prompt, Role: "user"}
 	var newChatCreated bool
 	switch err {
@@ -301,7 +327,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			ID:       id,
 			Messages: []Message{},
 		}
-		err := saveChat(r.Context(), h.q, chat)
+		err := saveChat(r.Context(), q, chat)
 		if err != nil {
 			slog.Error("failed to initialize chat", "with", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -326,7 +352,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			stream.Chunks <- t
 
 			// Persist title
-			err = h.q.SaveChatTitle(titleCtx, db.SaveChatTitleParams{
+			err = q.SaveChatTitle(titleCtx, db.SaveChatTitleParams{
 				ID:    chat.ID.String(),
 				Title: t,
 			})
@@ -341,7 +367,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get branch
-	branch, err := findChatBranch(r.Context(), h.q, id, branchID)
+	branch, err := findChatBranch(r.Context(), q, id, branchID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -350,13 +376,13 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 
 	// New branch should be created
 	if len(branch.Messages) == 1 {
-		err = updateBranchMessages(r.Context(), h.q, chat.ID, branch)
+		err = updateBranchMessages(r.Context(), q, chat.ID, branch)
 		if err != nil {
 			slog.Error("failed to save new branch", "with", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		err = saveChatLog(r.Context(), h.q, chat.ID, LogBranchCreated{
+		err = saveChatLog(r.Context(), q, chat.ID, LogBranchCreated{
 			BranchID:         branch.ID.String(),
 			OriginMessageIdx: len(chat.Messages) - 1,
 		})
@@ -370,7 +396,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	mentionedChats := make([]Chat, len(mentions))
 	for i, v := range mentions {
 		// Find mentioned chat
-		m, err := findChat(r.Context(), h.q, v.ID)
+		m, err := findChat(r.Context(), q, v.ID)
 		if err != nil {
 			slog.Error("failed to find mentioned chat", "err", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -378,7 +404,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Save used mention
-		err = h.q.SaveMention(r.Context(), db.SaveMentionParams{
+		err = q.SaveMention(r.Context(), db.SaveMentionParams{
 			TargetID: v.ID.String(),
 			SourceID: chat.ID.String(),
 		})
@@ -408,7 +434,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		branch.Messages = append(branch.Messages, msg)
-		err = updateBranchMessages(ctx, h.q, chat.ID, branch)
+		err = updateBranchMessages(ctx, q, chat.ID, branch)
 		if err != nil {
 			slog.Error("failed to save chat after generation", "with", err)
 		}
@@ -544,7 +570,12 @@ func (h ChatHandler) getMergeStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	branch, err := findChatBranch(r.Context(), h.q, chatID, branchID)
+	q, err := h.getQueries(w, r)
+	if err != nil {
+		return
+	}
+
+	branch, err := findChatBranch(r.Context(), q, chatID, branchID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -583,8 +614,13 @@ func (h ChatHandler) getMerge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	q, err := h.getQueries(w, r)
+	if err != nil {
+		return
+	}
+
 	// Find branch
-	branch, err := findChatBranch(r.Context(), h.q, chatID, branchID)
+	branch, err := findChatBranch(r.Context(), q, chatID, branchID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -636,8 +672,13 @@ func (h ChatHandler) postMerge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	q, err := h.getQueries(w, r)
+	if err != nil {
+		return
+	}
+
 	// Find branch
-	branch, err := findChatBranch(r.Context(), h.q, chatID, branchID)
+	branch, err := findChatBranch(r.Context(), q, chatID, branchID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -656,13 +697,13 @@ func (h ChatHandler) postMerge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chat, err := findChat(r.Context(), h.q, chatID)
+	chat, err := findChat(r.Context(), q, chatID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	err = saveChatLog(r.Context(), h.q, chatID, LogBranchMerged{
+	err = saveChatLog(r.Context(), q, chatID, LogBranchMerged{
 		BranchID:           branch.ID.String(),
 		MergedAmount:       len(toMerge),
 		MergedAtMessageIdX: len(chat.Messages) - 1,
@@ -673,7 +714,7 @@ func (h ChatHandler) postMerge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chat.Messages = slices.Concat(chat.Messages, toMerge)
-	err = updateChatMessages(r.Context(), h.q, chat)
+	err = updateChatMessages(r.Context(), q, chat)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -704,8 +745,13 @@ func (h ChatHandler) postTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	q, err := h.getQueries(w, r)
+	if err != nil {
+		return
+	}
+
 	// Persist tag
-	err = h.q.SaveTag(r.Context(), db.SaveTagParams{
+	err = q.SaveTag(r.Context(), db.SaveTagParams{
 		ChatID: id.String(),
 		Name:   tag,
 	})
@@ -738,7 +784,12 @@ func (h ChatHandler) getTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.q.FindTags(r.Context(), id.String())
+	q, err := h.getQueries(w, r)
+	if err != nil {
+		return
+	}
+
+	rows, err := q.FindTags(r.Context(), id.String())
 	switch err {
 	case nil:
 		break
@@ -781,8 +832,13 @@ func (h ChatHandler) deleteTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	q, err := h.getQueries(w, r)
+	if err != nil {
+		return
+	}
+
 	// Delete tag
-	err = h.q.DeleteTag(r.Context(), db.DeleteTagParams{
+	err = q.DeleteTag(r.Context(), db.DeleteTagParams{
 		ChatID: id.String(),
 		Name:   tag,
 	})
@@ -791,6 +847,15 @@ func (h ChatHandler) deleteTags(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func (h ChatHandler) getQueries(w http.ResponseWriter, r *http.Request) (*db.Queries, error) {
+	userID := r.Context().Value(auth.UserIDKey)
+	q, err := h.db.Get(userID.(string))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	return q, err
 }
 
 func deserID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, err error) {

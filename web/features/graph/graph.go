@@ -2,7 +2,6 @@
 package graph
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 
@@ -15,18 +14,18 @@ import (
 type GraphHandler struct {
 	chatURI string
 	t       *templates.Templates
-	q       *db.Queries
+	db      *db.Factory
 }
 
-func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, chatURI string) *http.ServeMux {
+func InitMux(dbF *db.Factory, protector *auth.ProtectionMiddleware, chatURI string) *http.ServeMux {
 	h := GraphHandler{
 		chatURI: chatURI,
 		t:       templates.New("web/features/graph/views/*.html"),
-		q:       q,
+		db:      dbF,
 	}
 
 	m := http.NewServeMux()
-	m.HandleFunc("GET /", h.getGraph)
+	m.HandleFunc("GET /", protector.Protect(h.getGraph))
 	return m
 }
 
@@ -37,17 +36,19 @@ type Graph struct {
 }
 
 func (h GraphHandler) getGraph(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	q, err := h.getQueries(w, r)
+	if err != nil {
+		return
+	}
 
-	chats, err := h.q.FindChatTags(ctx)
+	chats, err := q.FindChatTags(r.Context())
 	if err != nil {
 		slog.Error("failed to find chats", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	mentions, err := h.q.FindChatMentions(ctx)
+	mentions, err := q.FindChatMentions(r.Context())
 	if err != nil {
 		slog.Error("failed to find chat mentions", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -65,4 +66,13 @@ func (h GraphHandler) getGraph(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func (h GraphHandler) getQueries(w http.ResponseWriter, r *http.Request) (*db.Queries, error) {
+	userID := r.Context().Value(auth.UserIDKey)
+	q, err := h.db.Get(userID.(string))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	return q, err
 }
