@@ -61,6 +61,7 @@ func InitMux(q *db.Queries, baseURI, graphURI string) *http.ServeMux {
 	m.HandleFunc("GET /{id}/branch/{branchId}/message/stream", h.getMessageStream)
 	m.HandleFunc("GET /{id}/branch/{branchId}/merge-status", h.getMergeStatus)
 	m.HandleFunc("GET /{id}/branch/{branchId}/merge", h.getMerge)
+	m.HandleFunc("POST /{id}/branch/{branchId}/merge", h.postMerge)
 	m.HandleFunc("GET /{id}/title", h.getTitle)
 	m.HandleFunc("GET /{id}/tags", h.getTags)
 	m.HandleFunc("POST /{id}/tags", h.postTags)
@@ -536,6 +537,58 @@ type mergeViewItem struct {
 	ID       int
 	Message  HTMLMessage
 	Selected bool
+}
+
+func (h ChatHandler) postMerge(w http.ResponseWriter, r *http.Request) {
+	// Validate data
+	chatID, err := deserID(w, r)
+	var errs []error
+	if err != nil {
+		errs = append(errs, err)
+	}
+	// Branch param always exists because of routing
+	branchID, _, err := deserBranchID(w, r)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		http.Error(w, errors.Join(errs...).Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Find branch
+	branch, err := findChatBranch(r.Context(), h.q, chatID, branchID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	var toMerge []Message
+	for idx, msg := range branch.Messages {
+		selected := r.FormValue(fmt.Sprintf("merge-item-%d", idx))
+		if selected == "on" {
+			toMerge = append(toMerge, msg)
+		}
+	}
+
+	slog.Info("messages to be merged", "length", len(toMerge))
+	if len(toMerge) == 0 {
+		http.Error(w, "At least one message should be merged", http.StatusBadRequest)
+		return
+	}
+
+	chat, err := findChat(r.Context(), h.q, chatID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	chat.Messages = slices.Concat(chat.Messages, toMerge)
+	err = updateChatMessages(r.Context(), h.q, chat)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Header().Set("HX-Redirect", fmt.Sprintf("%s/%s", h.baseURI, chatID))
 }
 
 type ChatTags struct {

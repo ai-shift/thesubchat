@@ -123,7 +123,6 @@ func saveChat(ctx context.Context, q *db.Queries, c Chat) error {
 	return nil
 }
 
-//lint:ignore U1000 Will be used later
 func updateChatMessages(ctx context.Context, q *db.Queries, c Chat) error {
 	slog.Info("updating chat messages", "id", c.ID)
 	encoded, err := json.Marshal(c.Messages)

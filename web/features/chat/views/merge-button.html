@@ -20,6 +20,8 @@
     </button>
 
     <button
+      hx-post="{{.BranchID}}/merge"
+      hx-include="#merge-form"
       x-show="isTransitioned"
       x-transition:enter="transition-all duration-200 ease-out delay-300"
       x-transition:enter-start="opacity-0 transform translate-x-full"

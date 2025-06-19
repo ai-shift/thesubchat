@@ -6,7 +6,8 @@
       .reduce((acc, el) => acc + Number(el.checked), 0)
   }
 </script>
-<fieldset
+<form
+  id="merge-form"
   class="flex flex-col w-full space-y-2 px-2 my-4"
   x-data="{ selected: calculateSelected() }"
   x-init="$dispatch('merge-start')"
