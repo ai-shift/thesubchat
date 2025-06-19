@@ -54,7 +54,8 @@
                     <form
                       id="prompt"
                       hx-post="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/message"
-                      hx-trigger="{{.Keybinds.SendMessage.Value}}"
+                      hx-trigger="{{.Keybinds.SendMessage.Value}}, submit"
+                      hx-indicator="#formIndicator"
                       hx-vals='js:{
                           "prompt": editor.getValue(),
                           "mentions": JSON.stringify(mentionedChats.map(mention => mention.chat))
@@ -73,7 +74,14 @@
                                   hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
                                   class="h-full w-full relative"></div>
                             </div>
-                            <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
+                            <button id="formIndicator" class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">
+                                <span class="hide-on-request">
+                                    Send
+                                </span>
+                                <div class="indicator h-10">
+                                    {{template "indicator"}}
+                                </div>
+                            </button>
                         </div>
                         {{if not .Empty}}
                             <button
