@@ -11,13 +11,6 @@
   }
 </style>
 <div class="p-2">
-  <a
-    class="block"
-    :class="getBranchIdFromURL() == null ? 'active-branch' : ''"
-    href="{{$.BaseURI}}/{{$.ChatID}}"
-  >
-    Main
-  </a>
   {{range .Items}}
     {{if not .Meta.BranchID}}
       {{continue}}
@@ -36,5 +29,12 @@
       {{.Meta.BranchID}}
     </a>
   {{end}}
+  <a
+    class="block"
+    :class="getBranchIdFromURL() == null ? 'active-branch' : ''"
+    href="{{$.BaseURI}}/{{$.ChatID}}"
+  >
+    Main
+  </a>
 </div>
 {{end}}
