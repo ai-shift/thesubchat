@@ -81,7 +81,6 @@ type ChatRender struct {
 type ChatViewData struct {
 	Chat              ChatRender
 	Branch            Branch
-	TitleGenerating   bool
 	ChatTitles        []db.FindChatTitlesRow
 	Keybinds          web.KeybindsTable
 	BaseURI           string
@@ -126,7 +125,6 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, titleGenerating := h.titleChan.Get(id)
 	_, messageGenerating := h.msgChan.Get(branch.ID)
 	err = h.templates.Render(w, "index", ChatViewData{
 		Chat: ChatRender{
@@ -135,7 +133,6 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 			Messages: renderMessages(chat),
 		},
 		Branch:            branch,
-		TitleGenerating:   titleGenerating,
 		ChatTitles:        chatTitles,
 		Keybinds:          web.Keybinds,
 		BaseURI:           h.baseURI,
@@ -190,10 +187,23 @@ func (h ChatHandler) getBranches(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+  chat, err := findChat(r.Context(), h.q, chatID)
+	if err != nil {
+		slog.Error("failed to find chat", "err", err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+  _, titleGenerating := h.titleChan.Get(chatID)
+
 	// Render response
 	err = h.templates.Render(w, "branch-tree", branchTreeView{
 		Items:   items,
-		ChatID:  chatID.String(),
+		Chat:  ChatRender{
+      ID: chat.ID,
+      Title: chat.Title,
+    },
+		TitleGenerating:   titleGenerating,
 		BaseURI: h.baseURI,
 	})
 	if err != nil {
@@ -204,7 +214,8 @@ func (h ChatHandler) getBranches(w http.ResponseWriter, r *http.Request) {
 
 type branchTreeView struct {
 	Items   []branchTreeViewItem
-	ChatID  string
+  TitleGenerating   bool
+	Chat              ChatRender
 	BaseURI string
 }
 
