@@ -56,6 +56,7 @@ func InitMux(dbF *db.Factory, protector *auth.ProtectionMiddleware, baseURI, gra
 	}
 	m := http.NewServeMux()
 	m.HandleFunc("GET /", protector.Protect(h.getEmptyChat))
+	m.HandleFunc("GET /redirect", protector.Protect(h.redirect))
 	m.HandleFunc("GET /{id}", protector.Protect(h.getChat))
 	m.HandleFunc("DELETE /{id}", protector.Protect(h.deleteChat))
 	m.HandleFunc("GET /{id}/branch", protector.Protect(h.getBranches))
@@ -87,6 +88,10 @@ type ChatViewData struct {
 	GraphURI          string
 	MessageGenerating bool
 	Empty             bool
+}
+
+func (h ChatHandler) redirect(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, fmt.Sprintf("%s/", h.baseURI), http.StatusMovedPermanently)
 }
 
 // TODO: Add streaming message to new chat response
