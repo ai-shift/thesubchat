@@ -42,7 +42,7 @@
           hx-trigger="load, messageStreamFinished"
           hx-swap="outerHTML"
         ></div>
-        {{if .Chat.Messages}}
+        {{if or .Chat.Messages .Branch.Messages}}
           <a
               href="{{.BaseURI}}"
               class="bg-blue-300 p-2"

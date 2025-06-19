@@ -237,7 +237,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		chat = Chat{
 			Title:    "New Chat",
 			ID:       id,
-			Messages: []Message{userMsg},
+			Messages: []Message{},
 		}
 		err := saveChat(r.Context(), h.q, chat)
 		if err != nil {
@@ -288,7 +288,7 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 
 	// New branch should be created
 	if len(branch.Messages) == 1 {
-		err = updateBranchMessages(ctx, h.q, chat.ID, branch)
+		err = updateBranchMessages(r.Context(), h.q, chat.ID, branch)
 		if err != nil {
 			slog.Error("failed to save chat after generation", "with", err)
 		}
