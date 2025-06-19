@@ -1,0 +1,38 @@
+{{define "merge-button"}}
+<div
+  x-data="{ isTransitioned: false }"
+  @merge-start.window="isTransitioned = !isTransitioned"
+>
+  <div class="relative flex items-center w-32">
+    <button
+      hx-get="{{.BranchID}}/merge"
+      hx-target="#messages"
+      x-show="!isTransitioned"
+      x-transition:enter="transition-all duration-200 ease-out"
+      x-transition:enter-start="opacity-0 transform translate-x-full"
+      x-transition:enter-end="opacity-100 transform translate-x-0"
+      x-transition:leave="transition-all duration-200 ease-in"
+      x-transition:leave-start="opacity-100 transform translate-x-0"
+      x-transition:leave-end="opacity-0 transform -translate-x-full"
+      class="absolute left-0 px-8 bg-blue-300 hover:bg-blue-500 transition-all duration-50"
+    >
+      Merge
+    </button>
+
+    <button
+      hx-post="{{.BranchID}}/merge"
+      hx-include="#merge-form"
+      x-show="isTransitioned"
+      x-transition:enter="transition-all duration-200 ease-out delay-300"
+      x-transition:enter-start="opacity-0 transform translate-x-full"
+      x-transition:enter-end="opacity-100 transform translate-x-0"
+      x-transition:leave="transition-all duration-200 ease-in"
+      x-transition:leave-start="opacity-100 transform translate-x-0"
+      x-transition:leave-end="opacity-0 transform -translate-x-full"
+      class="absolute left-0 px-8 text-white bg-indigo-400 hover:bg-indigo-500 transition-all duration-50"
+    >
+      Confirm
+    </button>
+  </div>
+</div>
+{{end}}

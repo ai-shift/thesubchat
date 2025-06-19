@@ -1,0 +1,40 @@
+{{define "merge"}}
+{{$itemID := "merge-item-"}}
+<script>
+  function calculateSelected() {
+    return Array.from(document.querySelectorAll('[id^="{{$itemID}}"]'))
+      .reduce((acc, el) => acc + Number(el.checked), 0)
+  }
+</script>
+<form
+  id="merge-form"
+  class="flex flex-col w-full space-y-2 px-2 my-4"
+  x-data="{ selected: calculateSelected() }"
+  x-init="$dispatch('merge-start')"
+>
+  <legend 
+    id="the-merge-moment"
+    class="text-xl p-4 border-black border-1 text-center"
+  >
+    THE MERGE MOMENT
+  </legend>
+  <p class="self-center text-gray-500">Selected: <span x-text="selected" class="text-blue-500"></span></p>
+  {{range .}}
+    <label
+      for="{{$itemID}}{{.ID}}"
+      class="flex justify-between w-full px-2 has-[input:checked]:bg-blue-100 hover:bg-blue-100/35"
+      @click="selected = calculateSelected()"
+    >
+      <input class="hidden" type="checkbox" id="{{$itemID}}{{.ID}}" name="{{$itemID}}{{.ID}}" {{if .Selected}} checked {{end}} />
+      <span class="select-none flex w-full">{{block "message" .Message}}{{end}}</span>
+    </label>
+  {{end}}
+</fieldset>
+<script>
+  document.getElementById("the-merge-moment")
+    .scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+</script>
+{{end}}

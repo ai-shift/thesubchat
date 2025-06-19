@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"shellshift/internal/templates"
 	"shellshift/web/features/auth"
 	"shellshift/web/features/chat/textchan"
+	"slices"
 	"strings"
 
 	"github.com/firebase/genkit/go/genkit"
@@ -54,9 +56,13 @@ func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, baseURI, graph
 	m := http.NewServeMux()
 	m.HandleFunc("GET /", h.getEmptyChat)
 	m.HandleFunc("GET /{id}", h.getChat)
+	m.HandleFunc("GET /{id}/branch/{branchId}", h.getChat)
 	m.HandleFunc("DELETE /{id}", h.deleteChat)
-	m.HandleFunc("POST /{id}/message", h.postUserMessage)
-	m.HandleFunc("GET /{id}/message/stream", h.getMessageStream)
+	m.HandleFunc("POST /{id}/branch/{branchId}/message", h.postUserMessage)
+	m.HandleFunc("GET /{id}/branch/{branchId}/message/stream", h.getMessageStream)
+	m.HandleFunc("GET /{id}/branch/{branchId}/merge-status", h.getMergeStatus)
+	m.HandleFunc("GET /{id}/branch/{branchId}/merge", h.getMerge)
+	m.HandleFunc("POST /{id}/branch/{branchId}/merge", h.postMerge)
 	m.HandleFunc("GET /{id}/title", h.getTitle)
 	m.HandleFunc("GET /{id}/tags", h.getTags)
 	m.HandleFunc("POST /{id}/tags", h.postTags)
@@ -65,19 +71,20 @@ func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, baseURI, graph
 }
 
 type ChatRender struct {
-	ID                uuid.UUID
-	Title             string
-	Messages          []HTMLMessage
-	MessageGenerating bool
+	ID       uuid.UUID
+	Title    string
+	Messages []HTMLMessage
 }
 
 type ChatViewData struct {
-	Chat            ChatRender
-	TitleGenerating bool
-	ChatTitles      []db.FindChatTitlesRow
-	Keybinds        web.KeybindsTable
-	BaseURI         string
-	GraphURI        string
+	Chat              ChatRender
+	Branch            Branch
+	TitleGenerating   bool
+	ChatTitles        []db.FindChatTitlesRow
+	Keybinds          web.KeybindsTable
+	BaseURI           string
+	GraphURI          string
+	MessageGenerating bool
 }
 
 // TODO: Add streaming message to new chat response
@@ -88,32 +95,48 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	chat, err := findChat(h.q, id)
+	branchID, exists, err := deserBranchID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var branch Branch
+	if exists {
+		branch, err = findChatBranch(r.Context(), h.q, id, branchID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	} else {
+		branch = Branch{ID: uuid.New()}
+	}
+	chat, err := findChat(r.Context(), h.q, id)
 	if err != nil {
 		slog.Error("failed to find chat", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	chatTitles, err := findChatsTitles(h.q)
+
 	if err != nil {
 		slog.Error("failed to find chat titles", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	_, titleGenerating := h.titleChan.Get(id)
-	_, messageGenerating := h.msgChan.Get(id)
+	_, messageGenerating := h.msgChan.Get(branch.ID)
 	err = h.templates.Render(w, "index", ChatViewData{
 		Chat: ChatRender{
-			ID:                chat.ID,
-			Title:             chat.Title,
-			Messages:          renderMessages(chat),
-			MessageGenerating: messageGenerating,
+			ID:       chat.ID,
+			Title:    chat.Title,
+			Messages: renderMessages(chat),
 		},
-		TitleGenerating: titleGenerating,
-		ChatTitles:      chatTitles,
-		Keybinds:        web.Keybinds,
-		BaseURI:         h.baseURI,
-		GraphURI:        h.graphURI,
+		Branch:            branch,
+		TitleGenerating:   titleGenerating,
+		ChatTitles:        chatTitles,
+		Keybinds:          web.Keybinds,
+		BaseURI:           h.baseURI,
+		GraphURI:          h.graphURI,
+		MessageGenerating: messageGenerating,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
@@ -153,6 +176,7 @@ func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 		Chat: ChatRender{
 			ID: uuid.New(),
 		},
+		Branch:     Branch{ID: uuid.New()},
 		ChatTitles: chatTitles,
 		Keybinds:   web.Keybinds,
 		BaseURI:    h.baseURI,
@@ -172,40 +196,49 @@ type ChatMention struct {
 
 func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	// Validate request
+	var errs []error
 	prompt := r.FormValue("prompt")
-
 	if prompt == "" {
-		http.Error(w, "Prompt shouldn't be empty", http.StatusBadRequest)
-		return
+		errs = append(errs, fmt.Errorf("prompt shouldn't be empty"))
 	}
 
 	mentionsJSON := r.FormValue("mentions")
 	mentions := []ChatMention{}
-
 	err := json.Unmarshal([]byte(mentionsJSON), &mentions)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		errs = append(errs, err)
 	}
 
 	id, err := deserID(w, r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		errs = append(errs, err)
+	}
+
+	// Branch ID always exists because of routing
+	branchID, _, err := deserBranchID(w, r)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		http.Error(w, errors.Join(errs...).Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Get chat
-	chat, err := findChat(h.q, id)
+	chat, err := findChat(r.Context(), h.q, id)
 	userMsg := Message{Text: prompt, Role: "user"}
 	var newChatCreated bool
 	switch err {
 	case nil:
-		chat.Messages = append(chat.Messages, userMsg)
+		break
+	// TODO: Move to service
 	case sql.ErrNoRows:
+		// Create new chat
 		chat = Chat{
 			Title:    "New Chat",
 			ID:       id,
-			Messages: []Message{userMsg},
+			Messages: []Message{},
 		}
 		err := saveChat(r.Context(), h.q, chat)
 		if err != nil {
@@ -214,6 +247,8 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		newChatCreated = true
+
+		// Generate title in background
 		titleCtx := context.Background()
 		go func() {
 			stream := h.titleChan.Alloc(id)
@@ -244,15 +279,34 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mentionedChats := make([]Chat, len(mentions))
+	// Get branch
+	branch, err := findChatBranch(r.Context(), h.q, id, branchID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	branch.Messages = append(branch.Messages, userMsg)
 
+	// New branch should be created
+	if len(branch.Messages) == 1 {
+		err = updateBranchMessages(r.Context(), h.q, chat.ID, branch)
+		if err != nil {
+			slog.Error("failed to save chat after generation", "with", err)
+		}
+	}
+
+	// Get mentioned chats
+	mentionedChats := make([]Chat, len(mentions))
 	for i, v := range mentions {
-		m, err := findChat(h.q, v.ID)
+		// Find mentioned chat
+		m, err := findChat(r.Context(), h.q, v.ID)
 		if err != nil {
 			slog.Error("failed to find mentioned chat", "err", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Save used mention
 		err = h.q.SaveMention(r.Context(), db.SaveMentionParams{
 			TargetID: v.ID.String(),
 			SourceID: chat.ID.String(),
@@ -262,45 +316,67 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
+		// Collect
 		mentionedChats[i] = m
 	}
 
 	// Eval prompt
 	// TODO: Add timeout
-	go func(ctx context.Context, chat Chat) {
-		stream := h.msgChan.Alloc(chat.ID)
-		defer h.msgChan.Free(chat.ID)
+	go func(branch Branch) {
+		ctx := context.Background()
+		stream := h.msgChan.Alloc(branch.ID)
+		defer h.msgChan.Free(branch.ID)
 
-		msg, err := generateMessage(ctx, h.g, chat.Messages, mentionedChats, stream.Chunks)
+		msg, err := generateMessage(ctx, h.g,
+			slices.Concat(chat.Messages, branch.Messages),
+			mentionedChats,
+			stream.Chunks,
+		)
 		if err != nil {
 			slog.Error("failed to generate message", "with", err)
 			return
 		}
-		chat.Messages = append(chat.Messages, msg)
-		err = updateChatMessages(ctx, h.q, chat)
+		branch.Messages = append(branch.Messages, msg)
+		err = updateBranchMessages(ctx, h.q, chat.ID, branch)
 		if err != nil {
 			slog.Error("failed to save chat after generation", "with", err)
 		}
-	}(context.Background(), chat)
+	}(branch)
 
 	// Redirect to the new page
-	if newChatCreated {
-		slog.Error("redirecting to the created chat")
-		w.Header().Set("HX-Redirect", chat.ID.String())
+	if newChatCreated || len(branch.Messages) == 1 {
+		slog.Info("New chat & branch created")
+		w.Header().Set(
+			"HX-Redirect",
+			fmt.Sprintf("%s/%s/branch/%s", h.baseURI, chat.ID.String(), branchID.String()),
+		)
 		return
 	}
 
 	// Render messages
-	err = h.templates.Render(w, "message", chat.Messages[len(chat.Messages)-1])
+	err = h.templates.Render(w, "message", branch.Messages[len(branch.Messages)-1])
 	if err != nil {
 		slog.Error("failed to render user message", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	err = h.templates.Render(w, "streamed-message", chat)
-	if err != nil {
+	view := StreamedMessageView{BaseURI: h.baseURI}
+	view.Chat.ID = chat.ID.String()
+	view.Branch.ID = branch.ID.String()
+
+	if err := h.templates.Render(w, "streamed-message", view); err != nil {
 		slog.Error("failed to render streamed message", "with", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+type StreamedMessageView struct {
+	Chat struct {
+		ID string
+	}
+	Branch struct {
+		ID string
+	}
+	BaseURI string
 }
 
 func (h ChatHandler) getTitle(w http.ResponseWriter, r *http.Request) {
@@ -331,14 +407,13 @@ func (h ChatHandler) getMessageStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	id, err := deserID(w, r)
+	branchID, _, err := deserBranchID(w, r)
 	if err != nil {
-		slog.Error("got invalid chat id", "val", id)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	stream, ok := h.msgChan.Get(id)
+	stream, ok := h.msgChan.Get(branchID)
 	if !ok {
 		sse.Send(w, sse.Event{
 			Type: "finished",
@@ -379,6 +454,150 @@ loop:
 	})
 
 	<-r.Context().Done()
+}
+
+func (h ChatHandler) getMergeStatus(w http.ResponseWriter, r *http.Request) {
+	// Validate data
+	chatID, err := deserID(w, r)
+	var errs []error
+	if err != nil {
+		errs = append(errs, err)
+	}
+	// Branch param always exists because of routing
+	branchID, _, err := deserBranchID(w, r)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		http.Error(w, errors.Join(errs...).Error(), http.StatusBadRequest)
+		return
+	}
+
+	branch, err := findChatBranch(r.Context(), h.q, chatID, branchID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	if len(branch.Messages) < 2 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	err = h.templates.Render(w, "merge-button", mergeButtonView{BranchID: branch.ID.String()})
+	if err != nil {
+		slog.Error("failed to render tempalte", "with", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+type mergeButtonView struct {
+	BranchID string
+}
+
+func (h ChatHandler) getMerge(w http.ResponseWriter, r *http.Request) {
+	// Validate data
+	chatID, err := deserID(w, r)
+	var errs []error
+	if err != nil {
+		errs = append(errs, err)
+	}
+	// Branch param always exists because of routing
+	branchID, _, err := deserBranchID(w, r)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		http.Error(w, errors.Join(errs...).Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Find branch
+	branch, err := findChatBranch(r.Context(), h.q, chatID, branchID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	// TODO: Decompose into separate function (look `getMergeStatus`)
+	if len(branch.Messages) < 2 {
+		http.Error(w, "Branch should countain at least 2 messages", http.StatusBadRequest)
+		return
+	}
+
+	// Build merge items
+	items := make([]mergeViewItem, len(branch.Messages))
+	for i, msg := range branch.Messages {
+		items[i] = mergeViewItem{
+			ID:       i,
+			Message:  renderMessage(msg),
+			Selected: i == 0 || i == len(branch.Messages)-1,
+		}
+	}
+
+	// Render tempalte
+	if err := h.templates.Render(w, "merge", items); err != nil {
+		slog.Error("failed to render tempalte", "with", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+type mergeViewItem struct {
+	ID       int
+	Message  HTMLMessage
+	Selected bool
+}
+
+func (h ChatHandler) postMerge(w http.ResponseWriter, r *http.Request) {
+	// Validate data
+	chatID, err := deserID(w, r)
+	var errs []error
+	if err != nil {
+		errs = append(errs, err)
+	}
+	// Branch param always exists because of routing
+	branchID, _, err := deserBranchID(w, r)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		http.Error(w, errors.Join(errs...).Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Find branch
+	branch, err := findChatBranch(r.Context(), h.q, chatID, branchID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	var toMerge []Message
+	for idx, msg := range branch.Messages {
+		selected := r.FormValue(fmt.Sprintf("merge-item-%d", idx))
+		if selected == "on" {
+			toMerge = append(toMerge, msg)
+		}
+	}
+
+	slog.Info("messages to be merged", "length", len(toMerge))
+	if len(toMerge) == 0 {
+		http.Error(w, "At least one message should be merged", http.StatusBadRequest)
+		return
+	}
+
+	chat, err := findChat(r.Context(), h.q, chatID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	chat.Messages = slices.Concat(chat.Messages, toMerge)
+	err = updateChatMessages(r.Context(), h.q, chat)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Header().Set("HX-Redirect", fmt.Sprintf("%s/%s", h.baseURI, chatID))
 }
 
 type ChatTags struct {
@@ -497,6 +716,21 @@ func deserID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, err error) {
 	id, err = uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		slog.Error("failed to parse chat", "id", id, "with", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	return
+}
+
+func deserBranchID(w http.ResponseWriter, r *http.Request) (id uuid.UUID, exists bool, err error) {
+	branchID := r.PathValue("branchId")
+	if branchID == "" {
+		slog.Info("got empty branchId")
+		return
+	}
+	exists = true
+	id, err = uuid.Parse(branchID)
+	if err != nil {
+		slog.Error("failed to parse branch", "id", id, "with", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 	return

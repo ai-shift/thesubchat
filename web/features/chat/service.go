@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -28,8 +29,7 @@ type Message struct {
 	Role string
 }
 
-func findChat(q *db.Queries, id uuid.UUID) (Chat, error) {
-	ctx := context.Background()
+func findChat(ctx context.Context, q *db.Queries, id uuid.UUID) (Chat, error) {
 	chat, err := q.FindChat(ctx, id.String())
 	if err != nil {
 		return Chat{}, err
@@ -44,6 +44,32 @@ func findChat(q *db.Queries, id uuid.UUID) (Chat, error) {
 		Title:    chat.Title,
 		Messages: msgs,
 	}, nil
+}
+
+type Branch struct {
+	ID       uuid.UUID
+	Messages []Message
+}
+
+func findChatBranch(ctx context.Context, q *db.Queries, chatID uuid.UUID, branchID uuid.UUID) (b Branch, _ error) {
+	b.ID = branchID
+	msgsBlob, err := q.FindChatBranch(ctx, db.FindChatBranchParams{
+		ID:     branchID.String(),
+		ChatID: chatID.String(),
+	})
+	switch err {
+	case nil:
+		break
+	case sql.ErrNoRows:
+		return b, nil
+	default:
+		return b, err
+	}
+	err = json.Unmarshal(msgsBlob, &b.Messages)
+	if err != nil {
+		return b, err
+	}
+	return b, nil
 }
 
 func findChatsTitles(q *db.Queries) ([]db.FindChatTitlesRow, error) {
@@ -115,6 +141,25 @@ func updateChatMessages(ctx context.Context, q *db.Queries, c Chat) error {
 	return nil
 }
 
+func updateBranchMessages(ctx context.Context, q *db.Queries, chatID uuid.UUID, b Branch) error {
+	slog.Info("updating branch messages", "chatId", chatID, "id", b.ID)
+	encoded, err := json.Marshal(b.Messages)
+	if err != nil {
+		slog.Error("failed to encode branch messages", "err", err)
+		return err
+	}
+	err = q.SaveOrUpdateChatBranchMessages(ctx, db.SaveOrUpdateChatBranchMessagesParams{
+		ID:       b.ID.String(),
+		ChatID:   chatID.String(),
+		Messages: encoded,
+	})
+	if err != nil {
+		slog.Error("failed to persist branch messages", "err", err)
+		return err
+	}
+	return nil
+}
+
 func generateMessage(ctx context.Context, g *genkit.Genkit, msgs []Message, mentioned []Chat, s chan<- string) (msg Message, err error) {
 	slog.Info("Starting message generation")
 	// Prepare messages
@@ -168,6 +213,13 @@ func renderMessages(chat Chat) []HTMLMessage {
 	}
 
 	return htmlMessages
+}
+
+func renderMessage(msg Message) HTMLMessage {
+	return HTMLMessage{
+		Role: msg.Role,
+		Text: markdownToHTML(msg.Text),
+	}
 }
 
 func markdownToHTML(markdownStr string) template.HTML {
