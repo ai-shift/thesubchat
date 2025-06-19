@@ -27,7 +27,13 @@
       href="{{$.BaseURI}}/{{$.ChatID}}/branch/{{.Meta.BranchID}}"
       :class="getBranchIdFromURL() === '{{.Meta.BranchID}}' ? 'active-branch' : ''"
     >
-      {{.Action}} - {{.Meta.BranchID}}
+      {{if eq .Action "branch-created"}}
+        &gt;
+      {{else if eq .Action "branch-merged"}}
+        &lt;
+      {{end}}
+
+      {{.Meta.BranchID}}
     </a>
   {{end}}
 </div>
