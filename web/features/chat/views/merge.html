@@ -9,6 +9,7 @@
 <fieldset
   class="flex flex-col w-full space-y-2 px-2 my-4"
   x-data="{ selected: calculateSelected() }"
+  x-init="$dispatch('merge-start')"
 >
   <legend 
     id="the-merge-moment"
