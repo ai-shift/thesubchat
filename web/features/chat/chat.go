@@ -175,12 +175,6 @@ func (h ChatHandler) getBranches(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	// Prepare view data
-	items := []branchTreeViewItem{branchTreeViewItem{
-		Title:    "main",
-		BranchID: "",
-	}}
-
 	branches, err := h.q.FindChatBranches(r.Context(), chatID.String())
 	switch err {
 	case nil:
@@ -192,17 +186,19 @@ func (h ChatHandler) getBranches(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	items := make([]branchTreeViewItem, len(branches))
 	for i, id := range branches {
-		items = append(items, branchTreeViewItem{
+		items[i] = branchTreeViewItem{
 			Title:    fmt.Sprintf("Branch %d", i),
 			BranchID: id,
-		})
+		}
 	}
 
 	// Render response
 	err = h.templates.Render(w, "branch-tree", branchTreeView{
-		Items:  items,
-		ChatID: chatID.String(),
+		Items:   items,
+		ChatID:  chatID.String(),
+		BaseURI: h.baseURI,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -211,8 +207,9 @@ func (h ChatHandler) getBranches(w http.ResponseWriter, r *http.Request) {
 }
 
 type branchTreeView struct {
-	Items  []branchTreeViewItem
-	ChatID string
+	Items   []branchTreeViewItem
+	ChatID  string
+	BaseURI string
 }
 
 type branchTreeViewItem struct {
