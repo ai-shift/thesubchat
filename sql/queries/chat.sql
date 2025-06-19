@@ -95,3 +95,11 @@ SET
     id = excluded.id,
     chat_id = excluded.chat_id,
     messages = excluded.messages;
+
+-- name: FindChatBranches :many
+SELECT
+    id
+FROM
+    chat_branch
+WHERE
+    chat_id = ?;

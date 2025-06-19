@@ -43,44 +43,52 @@
           </a>
         {{end}}
       </header>
-      <div class="flex flex-1 items-strech overflow-y-auto">
-          <div hx-get="{{.BranchURI}}" hx-swap="outerHTML" hx-trigger="load"></div>
+      <section class="flex w-full h-full">
+        <div
+          hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch"
+          hx-trigger="load"
+          class="w-48"
+        >
+
+        </div>
+        <div class="flex flex-col grow">
           {{template "messages" .}}
-      </div>
-      <form
-        id="prompt"
-        hx-post="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/message"
-        hx-trigger="{{.Keybinds.SendMessage.Value}}"
-        hx-vals='js:{
-            "prompt": editor.getValue(),
-            "mentions": JSON.stringify(mentionedChats.map(mention => mention.chat))
-            }'
-        hx-target="#messages"
-        hx-swap="beforeend"
-        hx-on::after-request="
-            if(event.detail.successful) this.reset()
-            editor.setValue()"
-        class="relative flex items-center justify-center bg-gray-300 p-4 pb-10"
-      >
-      <div class="flex w-full max-w-[60rem]">
-          <div class="h-full w-full relative p-3 bg-white">
-              <div
-                id="editor"
-                hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
-                class="h-full w-full relative"></div>
-          </div>
-          <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
-      </div>
-      {{if .Chat.Messages}}
-        <button 
-          class="absolute bottom-2 left-2"
-          hx-delete="{{.Chat.ID}}"
-          hx-confirm="Chat {{.Chat.Title}} will be deleted"
+          <form
+            id="prompt"
+            hx-post="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/message"
+            hx-trigger="{{.Keybinds.SendMessage.Value}}"
+            hx-vals='js:{
+                "prompt": editor.getValue(),
+                "mentions": JSON.stringify(mentionedChats.map(mention => mention.chat))
+                }'
+            hx-target="#messages"
+            hx-swap="beforeend"
+            hx-on::after-request="
+                if(event.detail.successful) this.reset()
+                editor.setValue()"
+            class="relative flex items-center justify-center bg-gray-300 p-4 pb-10"
           >
-          delete
-        </button>
-      {{end}}
-      </form>
+          <div class="flex w-full max-w-[60rem]">
+              <div class="h-full w-full relative p-3 bg-white">
+                  <div
+                    id="editor"
+                    hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
+                    class="h-full w-full relative"></div>
+              </div>
+              <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
+          </div>
+          {{if .Chat.Messages}}
+            <button 
+              class="absolute bottom-2 left-2"
+              hx-delete="{{.Chat.ID}}"
+              hx-confirm="Chat {{.Chat.Title}} will be deleted"
+              >
+              delete
+            </button>
+          {{end}}
+          </form>
+        </div>
+      </section>
     </body>
     <script>
       document.addEventListener("DOMContentLoaded", (evt) => {

@@ -57,8 +57,9 @@ func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, baseURI, graph
 	m := http.NewServeMux()
 	m.HandleFunc("GET /", h.getEmptyChat)
 	m.HandleFunc("GET /{id}", h.getChat)
-	m.HandleFunc("GET /{id}/branch/{branchId}", h.getChat)
 	m.HandleFunc("DELETE /{id}", h.deleteChat)
+	m.HandleFunc("GET /{id}/branch", h.getBranches)
+	m.HandleFunc("GET /{id}/branch/{branchId}", h.getChat)
 	m.HandleFunc("POST /{id}/branch/{branchId}/message", h.postUserMessage)
 	m.HandleFunc("GET /{id}/branch/{branchId}/message/stream", h.getMessageStream)
 	m.HandleFunc("GET /{id}/branch/{branchId}/merge-status", h.getMergeStatus)
@@ -165,6 +166,58 @@ func (h ChatHandler) deleteChat(w http.ResponseWriter, r *http.Request) {
 
 	// Redirect
 	w.Header().Set("HX-Redirect", h.graphURI)
+}
+
+func (h ChatHandler) getBranches(w http.ResponseWriter, r *http.Request) {
+	// Validate data
+	chatID, err := deserID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	// Prepare view data
+	items := []branchTreeViewItem{branchTreeViewItem{
+		Title:    "main",
+		BranchID: "",
+	}}
+
+	branches, err := h.q.FindChatBranches(r.Context(), chatID.String())
+	switch err {
+	case nil:
+		break
+	case sql.ErrNoRows:
+		break
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for i, id := range branches {
+		items = append(items, branchTreeViewItem{
+			Title:    fmt.Sprintf("Branch %d", i),
+			BranchID: id,
+		})
+	}
+
+	// Render response
+	err = h.templates.Render(w, "branch-tree", branchTreeView{
+		Items:  items,
+		ChatID: chatID.String(),
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+type branchTreeView struct {
+	Items  []branchTreeViewItem
+	ChatID string
+}
+
+type branchTreeViewItem struct {
+	Title    string
+	BranchID string
 }
 
 func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
