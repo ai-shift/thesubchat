@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -204,7 +203,7 @@ func (f *Factory) Get(id string) (*Queries, error) {
 				}
 			}
 			if len(errs) > 0 {
-				return nil, fmt.Errorf("failed to apply schema with %w", errors.Join(errs...))
+				slog.Error("failed to apply schema")
 			}
 
 			q := New(conn)

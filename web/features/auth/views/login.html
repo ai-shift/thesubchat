@@ -17,9 +17,13 @@
        const signInDiv = document.getElementById('sign-in')
 
        Clerk.mountSignIn(signInDiv, {
-         forceRedirectUrl: {{.HomeURI}},
+         forceRedirectUrl: "/chat",
          signUpUrl: "{{.BaseURI}}/register",
        })
+       Clerk.unmountSignInI()
+
+       await Clerk.reload()
+
      })
     </script>
   </html>

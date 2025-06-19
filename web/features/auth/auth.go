@@ -250,6 +250,7 @@ func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.
 				return
 			}
 			sessionCookie.Value = out.JWT
+			sessionCookie.Path = "/"
 			sessionCookie.Expires = time.Now().Add(60 * time.Second)
 			http.SetCookie(w, sessionCookie)
 			slog.Info("cookie was updated")
