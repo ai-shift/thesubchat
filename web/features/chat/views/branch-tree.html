@@ -1,0 +1,40 @@
+{{define "branch-tree"}}
+<script>
+  function getBranchIdFromURL() {
+    const match = window.location.pathname.match(/^\/chat\/.*\/branch\/(.*)$/);
+    return match ? match[1] : null;
+  }
+</script>
+<style type="text/tailwindcss">
+  .active-branch {
+    @apply text-blue-500 underline;
+  }
+</style>
+<div class="p-2">
+  {{range .Items}}
+    {{if not .Meta.BranchID}}
+      {{continue}}
+    {{end}}
+    <a
+      class="block"
+      href="{{$.BaseURI}}/{{$.ChatID}}/branch/{{.Meta.BranchID}}"
+      :class="getBranchIdFromURL() === '{{.Meta.BranchID}}' ? 'active-branch' : ''"
+    >
+      {{if eq .Action "branch-created"}}
+        &gt;
+      {{else if eq .Action "branch-merged"}}
+        &lt;
+      {{end}}
+
+      {{.Meta.BranchID}}
+    </a>
+  {{end}}
+  <a
+    class="block"
+    :class="getBranchIdFromURL() == null ? 'active-branch' : ''"
+    href="{{$.BaseURI}}/{{$.ChatID}}"
+  >
+    Main
+  </a>
+</div>
+{{end}}

@@ -83,6 +83,76 @@ func (q *Queries) FindChatBranch(ctx context.Context, arg FindChatBranchParams) 
 	return messages, err
 }
 
+const findChatBranches = `-- name: FindChatBranches :many
+SELECT
+    id
+FROM
+    chat_branch
+WHERE
+    chat_id = ?
+`
+
+func (q *Queries) FindChatBranches(ctx context.Context, chatID string) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, findChatBranches, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const findChatLog = `-- name: FindChatLog :many
+SELECT
+    ACTION,
+    meta
+FROM
+    chat_log
+WHERE
+    chat_id = ?
+`
+
+type FindChatLogRow struct {
+	Action string
+	Meta   []byte
+}
+
+func (q *Queries) FindChatLog(ctx context.Context, chatID string) ([]FindChatLogRow, error) {
+	rows, err := q.db.QueryContext(ctx, findChatLog, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FindChatLogRow
+	for rows.Next() {
+		var i FindChatLogRow
+		if err := rows.Scan(&i.Action, &i.Meta); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const findChatTitles = `-- name: FindChatTitles :many
 SELECT
     id,
@@ -171,6 +241,24 @@ type SaveChatParams struct {
 
 func (q *Queries) SaveChat(ctx context.Context, arg SaveChatParams) error {
 	_, err := q.db.ExecContext(ctx, saveChat, arg.ID, arg.Title, arg.Messages)
+	return err
+}
+
+const saveChatLog = `-- name: SaveChatLog :exec
+INSERT INTO
+    chat_log (chat_id, ACTION, meta)
+VALUES
+    (?, ?, ?)
+`
+
+type SaveChatLogParams struct {
+	ChatID string
+	Action string
+	Meta   []byte
+}
+
+func (q *Queries) SaveChatLog(ctx context.Context, arg SaveChatLogParams) error {
+	_, err := q.db.ExecContext(ctx, saveChatLog, arg.ChatID, arg.Action, arg.Meta)
 	return err
 }
 

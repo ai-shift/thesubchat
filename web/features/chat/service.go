@@ -4,18 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"log/slog"
-	"shellshift/internal/db"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
-	"github.com/google/uuid"
-
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
 	"github.com/gomarkdown/markdown/parser"
+	"github.com/google/uuid"
+
+	"shellshift/internal/db"
 )
 
 type Chat struct {
@@ -139,6 +140,113 @@ func updateChatMessages(ctx context.Context, q *db.Queries, c Chat) error {
 		return err
 	}
 	return nil
+}
+
+type ChatLogger interface {
+	encodeLogEntry() []byte
+	fromEncoded(enc []byte) (ChatLogger, error)
+	getActionName() string
+}
+
+type LogBranchCreated struct {
+	BranchID         string
+	OriginMessageIdx int
+}
+
+func (l LogBranchCreated) encodeLogEntry() []byte {
+	encoded, _ := json.Marshal(l)
+	return encoded
+}
+
+func (l LogBranchCreated) fromEncoded(enc []byte) (ChatLogger, error) {
+	var logger LogBranchCreated
+	err := json.Unmarshal(enc, &logger)
+	return logger, err
+}
+
+func (l LogBranchCreated) getActionName() string {
+	return "branch-created"
+}
+
+type LogBranchMerged struct {
+	BranchID           string
+	MergedAtMessageIdX int
+	MergedAmount       int
+}
+
+func (l LogBranchMerged) encodeLogEntry() []byte {
+	encoded, _ := json.Marshal(l)
+	return encoded
+}
+
+func (l LogBranchMerged) fromEncoded(enc []byte) (ChatLogger, error) {
+	var logger LogBranchMerged
+	err := json.Unmarshal(enc, &logger)
+	return logger, err
+}
+
+func (l LogBranchMerged) getActionName() string {
+	return "branch-merged"
+}
+
+func saveChatLog[T ChatLogger](ctx context.Context, q *db.Queries, chatID uuid.UUID, entry T) error {
+	err := q.SaveChatLog(ctx, db.SaveChatLogParams{
+		ChatID: chatID.String(),
+		Action: entry.getActionName(),
+		Meta:   entry.encodeLogEntry(),
+	})
+	if err != nil {
+		slog.Error("failed to save chat log", "action", entry.getActionName(), "with", err)
+	}
+	return err
+}
+
+type LogEntry struct {
+	Action string
+	Meta   ChatLogger
+}
+
+// XXX: Does not support optional fields in meta payload
+func findChatLog(ctx context.Context, q *db.Queries, chatID uuid.UUID) (log []LogEntry, _ error) {
+	rows, err := q.FindChatLog(ctx, chatID.String())
+	if err != nil {
+		return log, fmt.Errorf("failed to find chat log with %w", err)
+	}
+
+	// Used to match action & deserialzie
+	loggers := []ChatLogger{
+		LogBranchCreated{},
+		LogBranchMerged{},
+	}
+	var errs []error
+
+outer:
+	for _, row := range rows {
+		for _, logger := range loggers {
+			slog.Info("found chat log entry", "action", row.Action)
+			if row.Action != logger.getActionName() {
+				continue
+			}
+			meta, err := logger.fromEncoded(row.Meta)
+			if err != nil {
+				slog.Error("failed to unmarshal logger", "with", err)
+				errs = append(errs, err)
+				continue outer
+			}
+			slog.Info("adding log entry")
+			log = append(log, LogEntry{
+				Action: row.Action,
+				Meta:   meta,
+			})
+			continue outer
+		}
+		errs = append(errs, fmt.Errorf("unknown log action %s", row.Action))
+	}
+
+	if len(errs) > 1 {
+		return log, fmt.Errorf("failed to deserialize logs with %w", errors.Join(errs...))
+	}
+	return log, nil
 }
 
 func updateBranchMessages(ctx context.Context, q *db.Queries, chatID uuid.UUID, b Branch) error {

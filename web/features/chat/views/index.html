@@ -4,16 +4,6 @@
     <head>
       <title>Shell>> chat</title>
       {{block "meta" .}}{{end}}
-      <script
-        src="https://rawgithub.com/ajaxorg/ace-builds/master/src/ace.js"
-        type="text/javascript"
-        charset="utf-8"
-      ></script>
-      <script
-        src="https://rawgithub.com/ajaxorg/ace-builds/master/src/ext-language_tools.js"
-        type="text/javascript"
-        charset="utf-8"
-      ></script>
       <style>
        .active {
            background: #ed7eeb;
@@ -42,7 +32,7 @@
           hx-trigger="load, messageStreamFinished"
           hx-swap="outerHTML"
         ></div>
-        {{if or .Chat.Messages .Branch.Messages}}
+        {{if not .Empty}}
           <a
               href="{{.BaseURI}}"
               class="bg-blue-300 p-2"
@@ -91,10 +81,27 @@
           hx-delete="{{.Chat.ID}}"
           hx-confirm="Chat {{.Chat.Title}} will be deleted"
           >
-          delete
-        </button>
-      {{end}}
-      </form>
+          <div class="flex w-full max-w-[60rem]">
+              <div class="h-full w-full relative p-3 bg-white">
+                  <div
+                    id="editor"
+                    hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
+                    class="h-full w-full relative"></div>
+              </div>
+              <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
+          </div>
+          {{if not .Empty}}
+            <button
+              class="absolute bottom-2 left-2"
+              hx-delete="{{.Chat.ID}}"
+              hx-confirm="'{{.Chat.Title}}' will be deleted"
+            >
+              delete
+            </button>
+          {{end}}
+          </form>
+        </div>
+      </section>
     </body>
     <script>
       document.addEventListener("DOMContentLoaded", (evt) => {

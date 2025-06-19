@@ -20,6 +20,12 @@ type ChatBranch struct {
 	UpdatedAt int64
 }
 
+type ChatLog struct {
+	ChatID string
+	Action string
+	Meta   []byte
+}
+
 type ChatTag struct {
 	ChatID string
 	Name   string
@@ -32,9 +38,4 @@ type Mention struct {
 
 type SchemaMigration struct {
 	ID string
-}
-
-type SqliteSequence struct {
-	Name interface{}
-	Seq  interface{}
 }

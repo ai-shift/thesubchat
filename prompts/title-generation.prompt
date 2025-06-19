@@ -7,6 +7,6 @@ output:
     title: string
 ---
 
-Analyze given user query and return title for the future chat. Be creative and use 3 words maximum. Do not apply markdown formatting.
+Analyze given user query and return title for the future chat. Be creative and use 3 words maximum. Do not apply markdown formatting. Do not use words like 'chat' or 'query'
 
 {{query}}

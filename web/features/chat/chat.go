@@ -44,6 +44,7 @@ func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, baseURI, graph
 	if err != nil {
 		panic(fmt.Sprintf("could not initialize Genkit: %v", err))
 	}
+
 	h := ChatHandler{
 		templates: templates.New("web/features/chat/views/*.html"),
 		q:         q,
@@ -56,8 +57,9 @@ func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, baseURI, graph
 	m := http.NewServeMux()
 	m.HandleFunc("GET /", h.getEmptyChat)
 	m.HandleFunc("GET /{id}", h.getChat)
-	m.HandleFunc("GET /{id}/branch/{branchId}", h.getChat)
 	m.HandleFunc("DELETE /{id}", h.deleteChat)
+	m.HandleFunc("GET /{id}/branch", h.getBranches)
+	m.HandleFunc("GET /{id}/branch/{branchId}", h.getChat)
 	m.HandleFunc("POST /{id}/branch/{branchId}/message", h.postUserMessage)
 	m.HandleFunc("GET /{id}/branch/{branchId}/message/stream", h.getMessageStream)
 	m.HandleFunc("GET /{id}/branch/{branchId}/merge-status", h.getMergeStatus)
@@ -85,6 +87,7 @@ type ChatViewData struct {
 	BaseURI           string
 	GraphURI          string
 	MessageGenerating bool
+	Empty             bool
 }
 
 // TODO: Add streaming message to new chat response
@@ -122,6 +125,7 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+
 	_, titleGenerating := h.titleChan.Get(id)
 	_, messageGenerating := h.msgChan.Get(branch.ID)
 	err = h.templates.Render(w, "index", ChatViewData{
@@ -164,6 +168,51 @@ func (h ChatHandler) deleteChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("HX-Redirect", h.graphURI)
 }
 
+func (h ChatHandler) getBranches(w http.ResponseWriter, r *http.Request) {
+	// Validate data
+	chatID, err := deserID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	log, err := findChatLog(r.Context(), h.q, chatID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	slog.Info("found chat log", "length", len(log))
+
+	items := make([]branchTreeViewItem, len(log))
+	for i, l := range log {
+		items[i] = branchTreeViewItem{
+			Meta:   l.Meta,
+			Action: l.Action,
+		}
+	}
+
+	// Render response
+	err = h.templates.Render(w, "branch-tree", branchTreeView{
+		Items:   items,
+		ChatID:  chatID.String(),
+		BaseURI: h.baseURI,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+type branchTreeView struct {
+	Items   []branchTreeViewItem
+	ChatID  string
+	BaseURI string
+}
+
+type branchTreeViewItem struct {
+	Meta   ChatLogger
+	Action string
+}
+
 func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 	chatTitles, err := findChatsTitles(h.q)
 	if err != nil {
@@ -181,6 +230,7 @@ func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
 		Keybinds:   web.Keybinds,
 		BaseURI:    h.baseURI,
 		GraphURI:   h.graphURI,
+		Empty:      true,
 	})
 	if err != nil {
 		slog.Error("failed to render index page", "with", err.Error())
@@ -291,7 +341,17 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	if len(branch.Messages) == 1 {
 		err = updateBranchMessages(r.Context(), h.q, chat.ID, branch)
 		if err != nil {
-			slog.Error("failed to save chat after generation", "with", err)
+			slog.Error("failed to save new branch", "with", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		err = saveChatLog(r.Context(), h.q, chat.ID, LogBranchCreated{
+			BranchID:         branch.ID.String(),
+			OriginMessageIdx: len(chat.Messages) - 1,
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -586,6 +646,16 @@ func (h ChatHandler) postMerge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chat, err := findChat(r.Context(), h.q, chatID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = saveChatLog(r.Context(), h.q, chatID, LogBranchMerged{
+		BranchID:           branch.ID.String(),
+		MergedAmount:       len(toMerge),
+		MergedAtMessageIdX: len(chat.Messages) - 1,
+	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
