@@ -36,7 +36,7 @@
           {{end}}
         </h1>
         <div hx-get="{{.BaseURI}}/{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
-        <div  
+        <div
           id="merge-button-container"
           hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/merge-status"
           hx-trigger="load, messageStreamFinished"
@@ -57,7 +57,8 @@
       <form
         id="prompt"
         hx-post="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/message"
-        hx-trigger="{{.Keybinds.SendMessage.Value}}"
+        hx-trigger="{{.Keybinds.SendMessage.Value}}, submit"
+        hx-indicator="#loader"
         hx-vals='js:{
             "prompt": editor.getValue(),
             "mentions": JSON.stringify(mentionedChats.map(mention => mention.chat))
@@ -76,10 +77,12 @@
                 hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
                 class="h-full w-full relative"></div>
           </div>
-          <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
+            <button type="sumbit" class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500">
+              Send
+          </button>
       </div>
       {{if .Chat.Messages}}
-        <button 
+        <button
           class="absolute bottom-2 left-2"
           hx-delete="{{.Chat.ID}}"
           hx-confirm="Chat {{.Chat.Title}} will be deleted"
