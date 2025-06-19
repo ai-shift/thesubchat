@@ -1,241 +1,226 @@
 {{ define "index" }}
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <title>Shell>> chat</title>
-      {{block "meta" .}}{{end}}
-      <style>
-       .active {
-           background: #ed7eeb;
-           position: absolute;
-       }
-      </style>
-    </head>
-    <body class="flex flex-col flex-grow h-screen">
-      <header class="flex justify-between items-center bg-gray-200">
-        <a hx-trigger="click, {{.Keybinds.ToggleGraph.Value}} from:body"
-           hx-on::trigger='window.location="{{.GraphURI}}?fromChat={{.Chat.ID}}"'
-           >
-           Graph
-        </a>
-        <h1>
-          {{if .TitleGenerating}}
-            <span hx-get="{{.BaseURI}}/{{.Chat.ID}}/title" hx-trigger="load"></span>
-          {{else}}
-            {{.Chat.Title}}
-          {{end}}
-        </h1>
-        <div hx-get="{{.BaseURI}}/{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
-        <div
-          id="merge-button-container"
-          hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/merge-status"
-          hx-trigger="load, messageStreamFinished"
-          hx-swap="outerHTML"
-        ></div>
-        {{if not .Empty}}
-          <a
-              href="{{.BaseURI}}"
-              class="bg-blue-300 p-2"
-              hx-trigger="{{.Keybinds.NewChat.Value}} from:body"
-              hx-on::trigger='window.location="{{.BaseURI}}"'
-              >
-              Start a new chat
-          </a>
-        {{end}}
-      </header>
-      {{template "messages" .}}
-      <form
-        id="prompt"
-        hx-post="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/message"
-        hx-trigger="{{.Keybinds.SendMessage.Value}}, submit"
-        hx-indicator="#formLoader"
-        hx-disabled-elt="button"
-        hx-vals='js:{
-            "prompt": editor.getValue(),
-            "mentions": JSON.stringify(mentionedChats.map(mention => mention.chat))
-            }'
-        hx-target="#messages"
-        hx-swap="beforeend"
-        hx-on::after-request="
-        if(event.detail.successful) this.reset()
-            editor.setValue()"
-        class="relative flex items-center justify-center bg-gray-300 p-4 pb-10"
-      >
-      <div class="flex w-full max-w-[60rem]">
-          <div class="h-full w-full relative p-3 bg-white">
-              <div
-                id="editor"
-                hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
-                class="h-full w-full relative"></div>
-          </div>
-          <button id="formLoader" type="sumbit" class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500">
-              <span class="hide-with-request">Send</span>
-              <div  class="h-10 indicator">
-                  {{template "indicator"}}
-              </div>
-          </button>
-      </div>
-      {{if .Chat.Messages}}
-          <button
-          class="absolute bottom-2 left-2"
-          hx-delete="{{.Chat.ID}}"
-          hx-confirm="Chat {{.Chat.Title}} will be deleted"
-          >
-          <div class="flex w-full max-w-[60rem]">
-              <div class="h-full w-full relative p-3 bg-white">
-                  <div
-                    id="editor"
-                    hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
-                    class="h-full w-full relative"></div>
-              </div>
-              <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
-          </div>
-          {{if not .Empty}}
-            <button
-              class="absolute bottom-2 left-2"
-              hx-delete="{{.Chat.ID}}"
-              hx-confirm="'{{.Chat.Title}}' will be deleted"
-            >
-              delete
-            </button>
-          {{end}}
-          </form>
-        </div>
-      </section>
-    </body>
-    <script>
-      document.addEventListener("DOMContentLoaded", (evt) => {
-        document.getElementById('messagesEnd')
-          .scrollIntoView({
-            behavior: "smooth",
-            block: "end",
-          });
-      })
-    </script>
-    <script>
-     const chatTitlesIds = ({{.ChatTitles}} ?? []).filter(chat => chat.ID !== {{.Chat.ID}})
-     let mentionedChats = []
-
-     var editor = ace.edit('editor');
-     var Range = ace.require('ace/range').Range;
-
-     editor.setOptions({
-       enableBasicAutocompletion: true,
-       behavioursEnabled: true,
-       enableLiveAutocompletion: true,
-       showGutter: false,
-       printMargin: false,
-       highlightActiveLine: false,
-       maxLines: 5,
-       minLines: 5,
-       wrap: true,
-       indentedSoftWrap: false,
-     });
-
-     var mentionCompleter = {
-       identifierRegexps: [/^@.*/],
-       onInsert: (editor, completion) => {console.log(completion)},
-       getCompletions: function (editor, session, pos, prefix, callback) {
-         if (!prefix.startsWith("@")) {
-           return callback(null, [])
-         }
-
-         if (pos.column > 0) {
-           const symbolBeforeAt = editor.session.getTextRange({
-             start: {
-               ...pos,
-               column: pos.column - 2
-             },
-             end: {
-               ...pos,
-               column: pos.column - 1
+    <!DOCTYPE html>
+    <html lang="en">
+        <head>
+            <title>Shell>> chat</title>
+            {{block "meta" .}}{{end}}
+            <style>
+             .active {
+                 background: #ed7eeb;
+                 position: absolute;
              }
-           });
-
-           if (!/^(\t|\s)+/.test(symbolBeforeAt) && pos.column > 1) return callback(null, [])
-         }
-
-
-         wordList = chatTitlesIds.filter(chat => {
-           return !mentionedChats.find(mentioned => mentioned.chat.ID === chat.ID)
+            </style>
+        </head>
+        <body class="flex flex-col flex-grow h-screen">
+            <header class="flex justify-between items-center bg-gray-200">
+                <a hx-trigger="click, {{.Keybinds.ToggleGraph.Value}} from:body"
+                   hx-on::trigger='window.location="{{.GraphURI}}?fromChat={{.Chat.ID}}"'
+                >
+                    Graph
+                </a>
+                <h1>
+                    {{if .TitleGenerating}}
+                        <span hx-get="{{.BaseURI}}/{{.Chat.ID}}/title" hx-trigger="load"></span>
+                    {{else}}
+                        {{.Chat.Title}}
+                    {{end}}
+                </h1>
+                <div hx-get="{{.BaseURI}}/{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
+                <div
+                  id="merge-button-container"
+                  hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/merge-status"
+                  hx-trigger="load, messageStreamFinished"
+                  hx-swap="outerHTML"
+                ></div>
+                {{if not .Empty}}
+                    <a
+                      href="{{.BaseURI}}"
+                      class="bg-blue-300 p-2"
+                      hx-trigger="{{.Keybinds.NewChat.Value}} from:body"
+                      hx-on::trigger='window.location="{{.BaseURI}}"'
+                    >
+                        Start a new chat
+                    </a>
+                {{end}}
+            </header>
+            <section class="flex w-full h-full">
+                <div
+                  hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch"
+                  hx-trigger="load"
+                  class="min-w-80"
+                ></div>
+                <div class="flex flex-col grow">
+                    {{template "messages" .}}
+                    <form
+                      id="prompt"
+                      hx-post="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/message"
+                      hx-trigger="{{.Keybinds.SendMessage.Value}}"
+                      hx-vals='js:{
+                          "prompt": editor.getValue(),
+                          "mentions": JSON.stringify(mentionedChats.map(mention => mention.chat))
+                          }'
+                      hx-target="#messages"
+                      hx-swap="beforeend"
+                      hx-on::after-request="
+                          if(event.detail.successful) this.reset()
+                          editor.setValue()"
+                      class="relative flex items-center justify-center bg-gray-300 p-4 pb-10"
+                    >
+                        <div class="flex w-full max-w-[60rem]">
+                            <div class="h-full w-full relative p-3 bg-white">
+                                <div
+                                  id="editor"
+                                  hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
+                                  class="h-full w-full relative"></div>
+                            </div>
+                            <button class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">Send</button>
+                        </div>
+                        {{if not .Empty}}
+                            <button
+                              class="absolute bottom-2 left-2"
+                              hx-delete="{{.Chat.ID}}"
+                              hx-confirm="'{{.Chat.Title}}' will be deleted"
+                            >
+                                delete
+                            </button>
+                        {{end}}
+                    </form>
+                </div>
+            </section>
+        </body>
+        <script>
+         document.addEventListener("DOMContentLoaded", (evt) => {
+           document.getElementById('messagesEnd')
+                   .scrollIntoView({
+                     behavior: "smooth",
+                     block: "end",
+                   });
          })
-         callback(
-           null,
-           wordList.map(function (ea) {
-             return {
-               name: ea.Title,
-               value: "@" + ea.Title,
-               meta: 'mention',
-             };
+        </script>
+        <script>
+         const chatTitlesIds = ({{.ChatTitles}} ?? []).filter(chat => chat.ID !== {{.Chat.ID}})
+         let mentionedChats = []
+
+         var editor = ace.edit('editor');
+         var Range = ace.require('ace/range').Range;
+
+         editor.setOptions({
+           enableBasicAutocompletion: true,
+           behavioursEnabled: true,
+           enableLiveAutocompletion: true,
+           showGutter: false,
+           printMargin: false,
+           highlightActiveLine: false,
+           maxLines: 5,
+           minLines: 5,
+           wrap: true,
+           indentedSoftWrap: false,
+         });
+
+         var mentionCompleter = {
+           identifierRegexps: [/^@.*/],
+           onInsert: (editor, completion) => {console.log(completion)},
+           getCompletions: function (editor, session, pos, prefix, callback) {
+             if (!prefix.startsWith("@")) {
+               return callback(null, [])
+             }
+
+             if (pos.column > 0) {
+               const symbolBeforeAt = editor.session.getTextRange({
+                 start: {
+                   ...pos,
+                   column: pos.column - 2
+                 },
+                 end: {
+                   ...pos,
+                   column: pos.column - 1
+                 }
+               });
+
+               if (!/^(\t|\s)+/.test(symbolBeforeAt) && pos.column > 1) return callback(null, [])
+             }
+
+
+             wordList = chatTitlesIds.filter(chat => {
+               return !mentionedChats.find(mentioned => mentioned.chat.ID === chat.ID)
+             })
+             callback(
+               null,
+               wordList.map(function (ea) {
+                 return {
+                   name: ea.Title,
+                   value: "@" + ea.Title,
+                   meta: 'mention',
+                 };
+               })
+             );
+           },
+         };
+
+         editor.completers = [mentionCompleter]
+
+         // Set mark on mention and push chat to mentionedChats
+         editor.on("change", (event) => {
+           if (event.action !== "insert") return event
+           if (!event.lines[0].startsWith("@")) return event
+
+           const chatTitle = event.lines[0].slice(1);
+           const chat = chatTitlesIds.find( chat => chat.Title.startsWith(chatTitle) && chatTitle != "")
+           if (!chat) return event
+
+           const range = new Range(event.start.row, event.start.column, event.end.row, event.end.column)
+           const marker = editor.getSession().addMarker(range,"active", "text");
+           if (!marker) return event
+
+           mentionedChats.push({
+             chat,
+             marker,
+             range
            })
-         );
-       },
-     };
+           return event
+         });
 
-     editor.completers = [mentionCompleter]
+         // Track changes in mentions ranges
+         editor.on("change", (event) => {
+           const eventRange = {start: event.start, end: event.end}
 
-     // Set mark on mention and push chat to mentionedChats
-     editor.on("change", (event) => {
-       if (event.action !== "insert") return event
-       if (!event.lines[0].startsWith("@")) return event
+           for (let i = 0; i < mentionedChats.length; i++) {
+             let chat = mentionedChats[i]
+             if (rangesAreEqual(chat.range, eventRange) || !rangesIntersect(chat.range, eventRange)) {
+               continue
+             }
+             editor.getSession().removeMarker(chat.marker)
+             editor.getSession().replace(chat.range, "")
+             mentionedChats.splice(i, 1)
+             break
+           }
 
-       const chatTitle = event.lines[0].slice(1);
-       const chat = chatTitlesIds.find( chat => chat.Title.startsWith(chatTitle) && chatTitle != "")
-       if (!chat) return event
+           return event
+         })
 
-       const range = new Range(event.start.row, event.start.column, event.end.row, event.end.column)
-       const marker = editor.getSession().addMarker(range,"active", "text");
-       if (!marker) return event
-
-       mentionedChats.push({
-         chat,
-         marker,
-         range
-       })
-       return event
-     });
-
-     // Track changes in mentions ranges
-     editor.on("change", (event) => {
-       const eventRange = {start: event.start, end: event.end}
-
-       for (let i = 0; i < mentionedChats.length; i++) {
-         let chat = mentionedChats[i]
-         if (rangesAreEqual(chat.range, eventRange) || !rangesIntersect(chat.range, eventRange)) {
-           continue
+         function rangesIntersect(rangeA, rangeB) {
+           function posIsBefore(p1, p2) {
+             return p1.row < p2.row || (p1.row === p2.row && p1.column < p2.column);
+           }
+           function posIsAfter(p1, p2) {
+             return p1.row > p2.row || (p1.row === p2.row && p1.column > p2.column);
+           }
+           function posIsEqual(p1, p2) {
+             return p1.row === p2.row && p1.column === p2.column;
+           }
+           if (posIsBefore(rangeA.end, rangeB.start) || posIsEqual(rangeA.end, rangeB.start)) {
+             return false;
+           }
+           if (posIsAfter(rangeA.start, rangeB.end) || posIsEqual(rangeA.start, rangeB.end)) {
+             return false;
+           }
+           return true;
          }
-         editor.getSession().removeMarker(chat.marker)
-         editor.getSession().replace(chat.range, "")
-         mentionedChats.splice(i, 1)
-         break
-       }
 
-       return event
-     })
+         function rangesAreEqual(rangeA, rangeB) {
+           return JSON.stringify(rangeA) === JSON.stringify(rangeB)
+         }
 
-     function rangesIntersect(rangeA, rangeB) {
-       function posIsBefore(p1, p2) {
-         return p1.row < p2.row || (p1.row === p2.row && p1.column < p2.column);
-       }
-       function posIsAfter(p1, p2) {
-         return p1.row > p2.row || (p1.row === p2.row && p1.column > p2.column);
-       }
-       function posIsEqual(p1, p2) {
-         return p1.row === p2.row && p1.column === p2.column;
-       }
-       if (posIsBefore(rangeA.end, rangeB.start) || posIsEqual(rangeA.end, rangeB.start)) {
-         return false;
-       }
-       if (posIsAfter(rangeA.start, rangeB.end) || posIsEqual(rangeA.start, rangeB.end)) {
-         return false;
-       }
-       return true;
-     }
-
-     function rangesAreEqual(rangeA, rangeB) {
-       return JSON.stringify(rangeA) === JSON.stringify(rangeB)
-     }
-
-    </script>
-  </html>
+        </script>
+    </html>
 {{ end }}
