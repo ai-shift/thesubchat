@@ -286,6 +286,14 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	branch.Messages = append(branch.Messages, userMsg)
 
+	// New branch should be created
+	if len(branch.Messages) == 1 {
+		err = updateBranchMessages(ctx, h.q, chat.ID, branch)
+		if err != nil {
+			slog.Error("failed to save chat after generation", "with", err)
+		}
+	}
+
 	// Get mentioned chats
 	mentionedChats := make([]Chat, len(mentions))
 	for i, v := range mentions {
