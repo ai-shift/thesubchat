@@ -37,8 +37,8 @@ func main() {
 	protector := auth.NewProtectionMiddleware(authURI, secretKey)
 
 	m.Handle("/", http.RedirectHandler(chatURI, http.StatusMovedPermanently))
-	m.Handle(fmt.Sprintf("%s/", chatURI), http.StripPrefix(chatURI, chat.InitMux(dbFactory, q, protector, chatURI, graphURI)))
-	m.Handle(fmt.Sprintf("%s/", graphURI), http.StripPrefix(graphURI, graph.InitMux(q, protector, chatURI)))
+	m.Handle(fmt.Sprintf("%s/", chatURI), http.StripPrefix(chatURI, chat.InitMux(dbFactory, protector, chatURI, graphURI)))
+	m.Handle(fmt.Sprintf("%s/", graphURI), http.StripPrefix(graphURI, graph.InitMux(dbFactory, protector, chatURI)))
 	m.Handle(fmt.Sprintf("%s/", authURI), http.StripPrefix(authURI, auth.InitMux(q, protector, secretKey, authURI, chatURI)))
 
 	port := os.Getenv("PORT")
