@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 )
 
 const (
@@ -33,6 +34,7 @@ type Factory struct {
 	authToken string
 	schema    []string
 	appName   string
+	l         sync.RWMutex
 }
 
 func NewFactory(schemaPath string) *Factory {
@@ -82,7 +84,9 @@ func NewFactory(schemaPath string) *Factory {
 
 func (f *Factory) Get(id string) (*Queries, error) {
 	// Search cache
+	f.l.RLock()
 	q, ok := f.cache[id]
+	f.l.RUnlock()
 	if ok {
 		return q, nil
 	}
@@ -130,7 +134,9 @@ func (f *Factory) Get(id string) (*Queries, error) {
 		q := New(conn)
 		slog.Info("db retrieved from API")
 		// Update cache
+		f.l.Lock()
 		f.cache[id] = q
+		f.l.Unlock()
 		return q, nil
 
 	case http.StatusNotFound:
@@ -204,18 +210,20 @@ func (f *Factory) Get(id string) (*Queries, error) {
 			q := New(conn)
 			slog.Info("new db was created")
 			// Update cache
+			f.l.Lock()
 			f.cache[id] = q
+			f.l.Unlock()
 			return q, nil
 		}
 	}
 }
 
-func (f Factory) initConnection(hostname, token string) (*sql.DB, error) {
+func (f *Factory) initConnection(hostname, token string) (*sql.DB, error) {
 	url := fmt.Sprintf("libsql://%s?authToken=%s", hostname, token)
 	return sql.Open("libsql", url)
 }
 
-func (f Factory) createDbToken(dbName string) (string, error) {
+func (f *Factory) createDbToken(dbName string) (string, error) {
 	slog.Info("creating new db token for", "dbName", dbName)
 	baseURL := fmt.Sprintf("%s/v1/organizations/%s/databases/%s/auth/tokens", f.apiHost, f.orgSlug, dbName)
 	u, err := url.Parse(baseURL)
