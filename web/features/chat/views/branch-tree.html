@@ -8,7 +8,7 @@
     <style type="text/tailwindcss">
     </style>
     <div>
-        <div class="bg-gray-100 p-4 mb-5 flex flex-col gap-3 p-4 border-b-2 border-gray-200 bg-gray-50 relative z-30">
+        <div class="bg-gray-100 p-4 flex flex-col gap-3 p-4 border-b-2 border-gray-200 bg-gray-50 relative z-30">
         <h1 class="text-lg uppercase">
             {{if .TitleGenerating}}
                 <span hx-get="{{.BaseURI}}/{{.Chat.ID}}/title" hx-trigger="load"></span>

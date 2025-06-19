@@ -1,22 +1,27 @@
 {{define "tags"}}
-  <div class="flex flex-col">
-    <div class="flex flex-col" id="saved-tags">
-      {{range .Tags}}
-        {{block "tag" .}}{{end}}
-      {{end}}
-    </div>
+  <div class="flex flex-col gap-1.5">
     <form
+      class="flex gap-3 h-8 items-center"
       hx-post="{{.ID}}/tags"
       hx-target="#saved-tags"
       hx-swap="beforeend"
       hx-on::after-request="if(event.detail.successful) this.reset()"
     >
         <input
+          class="bg-white border-2 px-3 py-2 text-gray-800 placeholder:text-gray-500 h-8 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-offset-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)] rounded-none border-gray-300 focus:border-blue-600 flex-1 text-sm"
           type="text"
           id="tag"
           hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
           name="tag"
           placeholder="Add new tag" />
+        <button class="h-full cursor-pointer text-lg aspect-square block transition-all duration-200 active:translate-x-[1px] active:translate-y-[1px] select-none whitespace-nowrap bg-gradient-to-b from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-2 border-green-800 shadow-[0_2px_0px_0px_#15803d] hover:shadow-[0_1px_0px_0px_#15803d] active:shadow-none flex items-center justify-center" type="submit">
+            +
+        </button>
     </form>
+    <div class="flex gap-2 flex-wrap" id="saved-tags">
+        {{range .Tags}}
+            {{block "tag" .}}{{end}}
+        {{end}}
+    </div>
   </div>
 {{end}}

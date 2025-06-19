@@ -1,21 +1,19 @@
 {{define "tag"}}
-  <form
-    id="tag-{{.Name}}"
-    hx-delete="{{.ChatID}}/tags"
-    hx-target="#tag-{{.Name}}"
-    hx-swap="delete"
-  >
-    <input
-      hx-post="{{.ChatID}}/tags"
-      type="text"
-      name="tag"
-      value="{{.Name}}"
-    />
-    <button
-      type="submit"
-      class="px-1.5 bg-red-100 cursor-pointer"
+    <div
+      class="flex bg-gradient-to-r from-yellow-300 to-yellow-400 text-gray-800 p-1.5 text-sm font-mono font-bold border-2 border-yellow-600 uppercase shadow-[0_1px_0px_0px_#ca8a04]"
+      id="tag-{{.Name}}"
     >
-      x
+        <button
+          hx-delete="{{.ChatID}}/tags"
+          hx-target="#tag-{{.Name}}"
+          hx-swap="delete"
+          class="flex cursor-pointer gap-1 items-center"
+        >
+        {{.Name}}
+        <i class="h-5 stroke-red-600" data-lucide="x"></i>
     </button>
-  </form>
+    <script>
+     lucide.createIcons();
+    </script>
+  </div>
 {{end}}
