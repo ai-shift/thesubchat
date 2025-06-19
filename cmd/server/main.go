@@ -25,6 +25,7 @@ func main() {
 	m := http.NewServeMux()
 	conn := factory.GetDB()
 	q := db.New(conn)
+	dbFactory := db.NewFactory("sql/migrations/schema.sql")
 	secretKey := os.Getenv("CLERK_SECRET_KEY")
 	if secretKey == "" {
 		panic("Clerk secret key is not available")
@@ -36,7 +37,7 @@ func main() {
 	protector := auth.NewProtectionMiddleware(authURI, secretKey)
 
 	m.Handle("/", http.RedirectHandler(chatURI, http.StatusMovedPermanently))
-	m.Handle(fmt.Sprintf("%s/", chatURI), http.StripPrefix(chatURI, chat.InitMux(q, protector, chatURI, graphURI)))
+	m.Handle(fmt.Sprintf("%s/", chatURI), http.StripPrefix(chatURI, chat.InitMux(dbFactory, q, protector, chatURI, graphURI)))
 	m.Handle(fmt.Sprintf("%s/", graphURI), http.StripPrefix(graphURI, graph.InitMux(q, protector, chatURI)))
 	m.Handle(fmt.Sprintf("%s/", authURI), http.StripPrefix(authURI, auth.InitMux(q, protector, secretKey, authURI, chatURI)))
 

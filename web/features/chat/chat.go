@@ -33,9 +33,10 @@ type ChatHandler struct {
 	titleChan *textchan.TextChan
 	baseURI   string
 	graphURI  string
+	db        *db.Factory
 }
 
-func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, baseURI, graphURI string) *http.ServeMux {
+func InitMux(dbF *db.Factory, q *db.Queries, protector *auth.ProtectionMiddleware, baseURI, graphURI string) *http.ServeMux {
 	ctx := context.Background()
 	g, err := genkit.Init(ctx,
 		genkit.WithPlugins(&googlegenai.GoogleAI{}),
@@ -53,6 +54,7 @@ func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, baseURI, graph
 		titleChan: textchan.New(),
 		baseURI:   baseURI,
 		graphURI:  graphURI,
+		db:        dbF,
 	}
 	m := http.NewServeMux()
 	m.HandleFunc("GET /", protector.Protect(h.getEmptyChat))
@@ -103,22 +105,30 @@ func (h ChatHandler) getChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	userID := r.Context().Value(auth.UserIDKey)
+	q, err := h.db.Get(userID.(string))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	var branch Branch
 	if exists {
-		branch, err = findChatBranch(r.Context(), h.q, id, branchID)
+		branch, err = findChatBranch(r.Context(), q, id, branchID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	} else {
 		branch = Branch{ID: uuid.New()}
 	}
-	chat, err := findChat(r.Context(), h.q, id)
+	chat, err := findChat(r.Context(), q, id)
 	if err != nil {
 		slog.Error("failed to find chat", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	chatTitles, err := findChatsTitles(h.q)
+	chatTitles, err := findChatsTitles(q)
 
 	if err != nil {
 		slog.Error("failed to find chat titles", "err", err.Error())
