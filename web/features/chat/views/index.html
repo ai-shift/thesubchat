@@ -4,52 +4,61 @@
         <head>
             <title>Shell>> chat</title>
             {{block "meta" .}}{{end}}
-            <style>
+            <style type="text/tailwindcss">
              .active {
-                 background: #ed7eeb;
-                 position: absolute;
+                 @apply bg-blue-300/60 absolute
+             }
+             .submit-btn svg{
+                 @apply fill-white
              }
             </style>
         </head>
-        <body class="flex flex-col flex-grow h-screen">
-            <header class="flex justify-between items-center bg-gray-200">
-                <a hx-trigger="click, {{.Keybinds.ToggleGraph.Value}} from:body"
-                   hx-on::trigger='window.location="{{.GraphURI}}?fromChat={{.Chat.ID}}"'
-                >
-                    Graph
-                </a>
-                <h1>
-                    {{if .TitleGenerating}}
-                        <span hx-get="{{.BaseURI}}/{{.Chat.ID}}/title" hx-trigger="load"></span>
-                    {{else}}
-                        {{.Chat.Title}}
-                    {{end}}
-                </h1>
-                <div hx-get="{{.BaseURI}}/{{.Chat.ID}}/tags" hx-swap="outerHTML" hx-trigger="load"></div>
-                <div
-                  id="merge-button-container"
-                  hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch/{{.Branch.ID}}/merge-status"
-                  hx-trigger="load, messageStreamFinished"
-                  hx-swap="outerHTML"
-                ></div>
-                {{if not .Empty}}
-                    <a
-                      href="{{.BaseURI}}"
-                      class="bg-blue-300 p-2"
-                      hx-trigger="{{.Keybinds.NewChat.Value}} from:body"
-                      hx-on::trigger='window.location="{{.BaseURI}}"'
+        <body class="grid grid-cols-[1fr_3fr] grid-rows-[auto_1fr] h-[100dvh]">
+            <header class="col-span-2 px-2 py-1 flex justify-between items-center bg-gray-200">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 border-2 border-blue-800 shadow-[0_2px_0px_0px_#1e40af] flex items-center justify-center">
+                            <i class="w-4 h-4 text-white" data-lucide="zap"></i>
+                        </div>
+                        <div class="hidden sm:block">
+                            <span class="font-mono font-black text-sm text-gray-800 tracking-wider">thesubchat</span>
+                            <div class="text-xs text-gray-600 font-mono -mt-0.5">Professional</div>
+                        </div>
+                    </div>
+                    <div class="h-6 w-px bg-gray-300 hidden md:block"></div>
+                    <a hx-trigger="click, {{.Keybinds.ToggleGraph.Value}} from:body"
+                       hx-on::trigger='window.location="{{.GraphURI}}?fromChat={{.Chat.ID}}"'
+                       class="font-lg cursor-pointer uppercase tracking-wide transition-all duration-200 relative overflow-hidden select-none bg-gray-100 hover:bg-gray-300 text-gray-800 border-2 border-gray-400 shadow-[0_2px_0px_0px_#9ca3af] hover:shadow-[0_1px_0px_0px_#9ca3af] px-3 py-1.5 text-xs h-7 min-w-[28px] gap-1.5 items-center justify-center hidden sm:flex"
                     >
-                        Start a new chat
+                        Graph
+                        <i class="stroke-gray-600" data-lucide="workflow"></i>
                     </a>
-                {{end}}
+                    {{if not .Empty}}
+                        <a
+                          href="{{.BaseURI}}"
+                          hx-trigger="{{.Keybinds.NewChat.Value}} from:body"
+                          hx-on::trigger='window.location="{{.BaseURI}}"'
+                          class="font-mono capitalize font-lg uppercase tracking-wide transition-all duration-200 relative overflow-hidden select-none whitespace-nowrap bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-2 border-blue-800 shadow-[0_2px_0px_0px_#1e40af] hover:shadow-[0_1px_0px_0px_#1e40af] active:shadow-none px-3 py-1.5 text-xs h-7 min-w-[28px] gap-1.5 flex items-center justify-center"
+                        >
+                            + new
+                        </a>
+                    {{end}}
+                </div>
             </header>
-            <section class="flex w-full h-full">
-                <div
-                  hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch"
-                  hx-trigger="load"
-                  class="min-w-80"
-                ></div>
-                <div class="flex flex-col grow">
+                <aside>
+                    <div
+                      hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch"
+                      hx-trigger="load"
+                      hx-indicator="#branchIndicator"
+                      swap="outerHTML"
+                    ></div>
+                    <div id="branchIndicator" class="indicator">
+                        <div class="h-10">
+                            {{template "indicator"}}
+                        </div>
+                    </div>
+                </aside>
+                <section class="overflow-y-auto flex flex-col">
                     {{template "messages" .}}
                     <form
                       id="prompt"
@@ -65,20 +74,23 @@
                       hx-on::after-request="
                           if(event.detail.successful) this.reset()
                           editor.setValue()"
-                      class="relative flex items-center justify-center bg-gray-300 p-4 pb-10"
+                      class="relative flex items-center justify-center p-4 pb-10"
                     >
-                        <div class="flex w-full max-w-[60rem]">
+                        <div class="flex gap-3 w-full max-w-[60rem] border-2 px-3 py-2 text-gray-800 border-gray-300 min-h-[80px] max-h-40 ">
                             <div class="h-full w-full relative p-3 bg-white">
                                 <div
                                   id="editor"
                                   hx-trigger="{{.Keybinds.ToggleGraph.Value}} consume, {{.Keybinds.NewChat.Value}} consume"
                                   class="h-full w-full relative"></div>
                             </div>
-                            <button id="formIndicator" class="p-5 bg-green-500 hover:bg-red-500 active:bg-yellow-500" type="submit">
+                            <button id="formIndicator"
+                                    class="w-20 cursor-pointer transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed select-none whitespace-nowrap bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 border-2 border-blue-800 shadow-[0_2px_0px_0px_#1e40af] hover:shadow-[0_1px_0px_0px_#1e40af] flex items-center justify-center"
+                                    type="submit"
+                            >
                                 <span class="hide-on-request">
-                                    Send
+                                    <i class="stroke-white" data-lucide="send"></i>
                                 </span>
-                                <div class="indicator h-10">
+                                <div class="indicator h-10 submit-btn">
                                     {{template "indicator"}}
                                 </div>
                             </button>
@@ -93,9 +105,11 @@
                             </button>
                         {{end}}
                     </form>
-                </div>
-            </section>
+                </section>
         </body>
+        <script>
+         lucide.createIcons();
+        </script>
         <script>
          document.addEventListener("DOMContentLoaded", (evt) => {
            document.getElementById('messagesEnd')

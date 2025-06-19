@@ -2,9 +2,11 @@
     <div
       class="{{if eq .Role "model"}}
         self-start
+        border-2 text-gray-800 border-gray-300 shadow-[0_2px_0px_0px_#d1d5db]
       {{else}}
-        self-end text-end text-blue-600
-      {{end}} py-4 max-w-4/5">
+        self-end text-end bg-gradient-to-br from-blue-500 to-blue-600 text-white border-2 border-blue-800 shadow-[0_2px_0px_0px_#1e40af]
+      {{end}}
+      p-4 max-w-[70%]">
         {{.Text}}
     </div>
 {{end}}

@@ -4,19 +4,20 @@
   @merge-start.window="isTransitioned = !isTransitioned"
 >
   <div class="relative flex items-center w-32">
-    <button
-      hx-get="{{.BranchID}}/merge"
-      hx-target="#messages"
-      x-show="!isTransitioned"
-      x-transition:enter="transition-all duration-200 ease-out"
-      x-transition:enter-start="opacity-0 transform translate-x-full"
-      x-transition:enter-end="opacity-100 transform translate-x-0"
-      x-transition:leave="transition-all duration-200 ease-in"
-      x-transition:leave-start="opacity-100 transform translate-x-0"
-      x-transition:leave-end="opacity-0 transform -translate-x-full"
-      class="absolute left-0 px-8 bg-blue-300 hover:bg-blue-500 transition-all duration-50"
-    >
-      Merge
+      <button
+        hx-get="{{.BranchID}}/merge"
+        hx-target="#messages"
+        x-show="!isTransitioned"
+        x-transition:enter="transition-all duration-200 ease-out"
+        x-transition:enter-start="opacity-0 transform translate-x-full"
+        x-transition:enter-end="opacity-100 transform translate-x-0"
+        x-transition:leave="transition-all duration-200 ease-in"
+        x-transition:leave-start="opacity-100 transform translate-x-0"
+        x-transition:leave-end="opacity-0 transform -translate-x-full"
+        class="font-mono font-medium uppercase tracking-wide transition-all duration-200 relative overflow-hidden select-none whitespace-nowrap bg-gradient-to-b from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-2 border-green-800 shadow-[0_2px_0px_0px_#15803d] hover:shadow-[0_1px_0px_0px_#15803d] px-3 py-1.5 text-xs h-7 min-w-[28px] gap-1.5 flex items-center justify-center"
+      >
+          <i class="stroke-white h-4" data-lucide="git-pull-request-arrow"></i>
+          Merge
     </button>
 
     <button
@@ -34,5 +35,8 @@
       Confirm
     </button>
   </div>
+  <script>
+   lucide.createIcons();
+  </script>
 </div>
 {{end}}
