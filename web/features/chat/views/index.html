@@ -47,10 +47,8 @@
         <div
           hx-get="{{.BaseURI}}/{{.Chat.ID}}/branch"
           hx-trigger="load"
-          class="w-48"
-        >
-
-        </div>
+          class="min-w-80"
+        ></div>
         <div class="flex flex-col grow">
           {{template "messages" .}}
           <form
