@@ -6,21 +6,19 @@
         {{block "meta" .}}{{end}}
     </head>
     <body class="h-[100dvh] flex justify-center items-center">
-        <div id="app"></div>
+        <div id="app">
+           <div id="sign-in"></div>
+        </div>
     </body>
     <script>
      window.addEventListener('load', async function () {
        await Clerk.load()
 
-       document.getElementById('app').innerHTML = `
-           <div id="sign-in"></div>
-       `
-
        const signInDiv = document.getElementById('sign-in')
 
        Clerk.mountSignIn(signInDiv, {
          forceRedirectUrl: {{.HomeURI}},
-         signUpUrl: {{.RegisterURI}},
+         signUpUrl: "{{.BaseURI}}/register",
        })
      })
     </script>

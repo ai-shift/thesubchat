@@ -21,20 +21,18 @@ import (
 )
 
 type AuthHandler struct {
-	t           *templates.Templates
-	q           *db.Queries
-	loginURI    string
-	registerURI string
-	homeURI     string
+	t       *templates.Templates
+	q       *db.Queries
+	baseURI string
+	homeURI string
 }
 
-func InitMux(q *db.Queries, protector *ProtectionMiddleware, loginURI, registerURI, homeURI string) *http.ServeMux {
+func InitMux(q *db.Queries, protector *ProtectionMiddleware, baseURI, homeURI string) *http.ServeMux {
 	h := AuthHandler{
-		t:           templates.New("web/features/auth/views/*.html"),
-		q:           q,
-		loginURI:    loginURI,
-		registerURI: registerURI,
-		homeURI:     homeURI,
+		t:       templates.New("web/features/auth/views/*.html"),
+		q:       q,
+		baseURI: baseURI,
+		homeURI: homeURI,
 	}
 
 	m := http.NewServeMux()
@@ -45,14 +43,14 @@ func InitMux(q *db.Queries, protector *ProtectionMiddleware, loginURI, registerU
 }
 
 type LoginRender struct {
-	RegisterURI string
-	HomeURI     string
+	BaseURI string
+	HomeURI string
 }
 
 func (h AuthHandler) getLogin(w http.ResponseWriter, r *http.Request) {
 	err := h.t.Render(w, "login", LoginRender{
-		RegisterURI: h.registerURI,
-		HomeURI:     h.homeURI,
+		BaseURI: h.baseURI,
+		HomeURI: h.homeURI,
 	})
 
 	if err != nil {
@@ -63,14 +61,14 @@ func (h AuthHandler) getLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 type RegisterRender struct {
-	LoginURI string
-	HomeURI  string
+	BaseURI string
+	HomeURI string
 }
 
 func (h AuthHandler) getRegister(w http.ResponseWriter, r *http.Request) {
 	err := h.t.Render(w, "register", RegisterRender{
-		LoginURI: h.loginURI,
-		HomeURI:  h.homeURI,
+		BaseURI: h.baseURI,
+		HomeURI: h.homeURI,
 	})
 
 	if err != nil {
@@ -82,8 +80,8 @@ func (h AuthHandler) getRegister(w http.ResponseWriter, r *http.Request) {
 
 func (h AuthHandler) getProfile(w http.ResponseWriter, r *http.Request) {
 	err := h.t.Render(w, "profile", RegisterRender{
-		LoginURI: h.loginURI,
-		HomeURI:  h.homeURI,
+		BaseURI: h.baseURI,
+		HomeURI: h.homeURI,
 	})
 
 	if err != nil {
@@ -97,15 +95,17 @@ type ProtectionMiddleware struct {
 	clerkSK    string
 	jwk        *clerk.JSONWebKey
 	jwksClient *jwks.Client
+	baseURI    string
 }
 
-func NewProtectionMiddleware(clerkSK string) *ProtectionMiddleware {
+func NewProtectionMiddleware(baseURI, clerkSK string) *ProtectionMiddleware {
 	config := &clerk.ClientConfig{}
 	config.Key = clerk.String(clerkSK)
 
 	return &ProtectionMiddleware{
 		clerkSK:    clerkSK,
 		jwksClient: jwks.NewClient(config),
+		baseURI:    baseURI,
 	}
 }
 
@@ -117,15 +117,15 @@ type userIDKey string
 
 const UserIDKey userIDKey = "user_id"
 
-// TODO: Use JWK
 func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
+	slog.Info("protecting route")
 	return func(w http.ResponseWriter, r *http.Request) {
-
+		slog.Info("check auth")
 		// Get the session JWT from the Authorization header
 		sessionCookie, err := r.Cookie("__session")
 		if err != nil {
-			slog.Error("Filed to extract cookie", "with", err)
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			slog.Info("session cookies wasn't found", "with", err)
+			http.Redirect(w, r, fmt.Sprintf("%s/login", m.baseURI), http.StatusMovedPermanently)
 			return
 		}
 
@@ -134,10 +134,10 @@ func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.
 			Token: sessionCookie.Value,
 		})
 		if err != nil {
+			slog.Error("failed to decode JWT claims")
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
-		slog.Info("unsafe claims", "val", unsafeClaims)
 
 		// Retrieve JSON web key
 		if m.jwk == nil {
@@ -222,10 +222,9 @@ func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		slog.Info("fetched user", "val", usr)
-
 		r = r.WithContext(context.WithValue(r.Context(), UserIDKey, usr.ID))
 
+		slog.Info("calling next")
 		next(w, r)
 	}
 }

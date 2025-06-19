@@ -20,7 +20,7 @@
 
            Clerk.mountSignUp(signUpDiv,{
              fallbackRedirectUrl: {{.HomeURI}},
-             signInUrl: {{.LoginURI}}
+             signInUrl: "{{.BaseURI}}/login",
            })
          })
         </script>

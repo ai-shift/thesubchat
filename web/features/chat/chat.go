@@ -10,11 +10,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"shellshift/internal/db"
-	"shellshift/internal/sse"
-	"shellshift/internal/templates"
-	"shellshift/web/features/auth"
-	"shellshift/web/features/chat/textchan"
 	"slices"
 	"strings"
 
@@ -22,7 +17,12 @@ import (
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/google/uuid"
 
+	"shellshift/internal/db"
+	"shellshift/internal/sse"
+	"shellshift/internal/templates"
 	"shellshift/web"
+	"shellshift/web/features/auth"
+	"shellshift/web/features/chat/textchan"
 )
 
 type ChatHandler struct {
@@ -55,7 +55,7 @@ func InitMux(q *db.Queries, protector *auth.ProtectionMiddleware, baseURI, graph
 		graphURI:  graphURI,
 	}
 	m := http.NewServeMux()
-	m.HandleFunc("GET /", h.getEmptyChat)
+	m.HandleFunc("GET /", protector.Protect(h.getEmptyChat))
 	m.HandleFunc("GET /{id}", h.getChat)
 	m.HandleFunc("DELETE /{id}", h.deleteChat)
 	m.HandleFunc("GET /{id}/branch", h.getBranches)
@@ -214,6 +214,8 @@ type branchTreeViewItem struct {
 }
 
 func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(auth.UserIDKey)
+	slog.Info("user", "id", userID)
 	chatTitles, err := findChatsTitles(h.q)
 	if err != nil {
 		slog.Error("failed to find chat titles", "err", err.Error())

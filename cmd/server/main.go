@@ -16,11 +16,9 @@ import (
 )
 
 const (
-	chatURI     = "/chat"
-	graphURI    = "/graph"
-	authURI     = "/auth"
-	loginURI    = "/auth/login"
-	registerURI = "/auth/register"
+	chatURI  = "/chat"
+	graphURI = "/graph"
+	authURI  = "/auth"
 )
 
 func main() {
@@ -35,11 +33,12 @@ func main() {
 	clerk.SetKey(secretKey)
 	slog.Info("Clerk key setted")
 
-	protector := auth.NewProtectionMiddleware(secretKey)
+	protector := auth.NewProtectionMiddleware(authURI, secretKey)
 
+	m.Handle("/", http.RedirectHandler(chatURI, http.StatusMovedPermanently))
 	m.Handle(fmt.Sprintf("%s/", chatURI), http.StripPrefix(chatURI, chat.InitMux(q, protector, chatURI, graphURI)))
 	m.Handle(fmt.Sprintf("%s/", graphURI), http.StripPrefix(graphURI, graph.InitMux(q, protector, chatURI)))
-	m.Handle(fmt.Sprintf("%s/", authURI), http.StripPrefix(authURI, auth.InitMux(q, protector, loginURI, registerURI, graphURI)))
+	m.Handle(fmt.Sprintf("%s/", authURI), http.StripPrefix(authURI, auth.InitMux(q, protector, authURI, chatURI)))
 
 	port := os.Getenv("PORT")
 	if port == "" {
