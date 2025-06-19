@@ -239,7 +239,7 @@ func (m *ProtectionMiddleware) Protect(next func(w http.ResponseWriter, r *http.
 
 			if resp.StatusCode >= 400 {
 				slog.Info("failed to refresh token", "status", resp.StatusCode, "body", string(body), "url", url)
-				http.Redirect(w, r, fmt.Sprintf("%s/login", m.baseURI), http.StatusMovedPermanently)
+				// http.Redirect(w, r, fmt.Sprintf("%s/login", m.baseURI), http.StatusMovedPermanently)
 				return
 			}
 
