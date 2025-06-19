@@ -20,6 +20,12 @@ type ChatBranch struct {
 	UpdatedAt int64
 }
 
+type ChatLog struct {
+	ChatID string
+	Action string
+	Meta   []byte
+}
+
 type ChatTag struct {
 	ChatID string
 	Name   string

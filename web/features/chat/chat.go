@@ -177,20 +177,32 @@ func (h ChatHandler) getBranches(w http.ResponseWriter, r *http.Request) {
 
 	branches, err := h.q.FindChatBranches(r.Context(), chatID.String())
 	switch err {
-	case nil:
-		break
 	case sql.ErrNoRows:
+		fallthrough
+	case nil:
 		break
 	default:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	log, err := h.q.FindChatLog(r.Context(), chatID.String())
+	switch err {
+	case sql.ErrNoRows:
+		fallthrough
+	case nil:
+		break
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	slog.Info("found chat log", "length", len(log))
+
 	items := make([]branchTreeViewItem, len(branches))
-	for i, id := range branches {
+	for i, b := range branches {
 		items[i] = branchTreeViewItem{
 			Title:    fmt.Sprintf("Branch %d", i),
-			BranchID: id,
+			BranchID: b,
 		}
 	}
 
@@ -215,6 +227,7 @@ type branchTreeView struct {
 type branchTreeViewItem struct {
 	Title    string
 	BranchID string
+	Action   string
 }
 
 func (h ChatHandler) getEmptyChat(w http.ResponseWriter, r *http.Request) {
@@ -344,7 +357,16 @@ func (h ChatHandler) postUserMessage(w http.ResponseWriter, r *http.Request) {
 	if len(branch.Messages) == 1 {
 		err = updateBranchMessages(r.Context(), h.q, chat.ID, branch)
 		if err != nil {
-			slog.Error("failed to save chat after generation", "with", err)
+			slog.Error("failed to save new branch", "with", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		err = saveChatLog(r.Context(), h.q, chat.ID, LogBranchCreated{
+			OriginMessageIdx: len(chat.Messages) - 1,
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -639,6 +661,15 @@ func (h ChatHandler) postMerge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chat, err := findChat(r.Context(), h.q, chatID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = saveChatLog(r.Context(), h.q, chatID, LogBranchMerged{
+		MergedAmount:       len(toMerge),
+		MergedAtMessageIdX: len(chat.Messages) - 1,
+	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

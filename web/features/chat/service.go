@@ -141,6 +141,50 @@ func updateChatMessages(ctx context.Context, q *db.Queries, c Chat) error {
 	return nil
 }
 
+type ChatLogger interface {
+	encodeLogEntry() []byte
+	getActionName() string
+}
+
+type LogBranchCreated struct {
+	OriginMessageIdx int
+}
+
+func (l LogBranchCreated) encodeLogEntry() []byte {
+	encoded, _ := json.Marshal(l)
+	return encoded
+}
+
+func (l LogBranchCreated) getActionName() string {
+	return "branch-created"
+}
+
+type LogBranchMerged struct {
+	MergedAtMessageIdX int
+	MergedAmount       int
+}
+
+func (l LogBranchMerged) encodeLogEntry() []byte {
+	encoded, _ := json.Marshal(l)
+	return encoded
+}
+
+func (l LogBranchMerged) getActionName() string {
+	return "branch-merged"
+}
+
+func saveChatLog[T ChatLogger](ctx context.Context, q *db.Queries, chatID uuid.UUID, entry T) error {
+	err := q.SaveChatLog(ctx, db.SaveChatLogParams{
+		ChatID: chatID.String(),
+		Action: entry.getActionName(),
+		Meta:   entry.encodeLogEntry(),
+	})
+	if err != nil {
+		slog.Error("failed to save chat log", "action", entry.getActionName(), "with", err)
+	}
+	return err
+}
+
 func updateBranchMessages(ctx context.Context, q *db.Queries, chatID uuid.UUID, b Branch) error {
 	slog.Info("updating branch messages", "chatId", chatID, "id", b.ID)
 	encoded, err := json.Marshal(b.Messages)
