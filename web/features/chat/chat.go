@@ -203,24 +203,24 @@ func (h ChatHandler) getBranches(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-  chat, err := findChat(r.Context(), h.q, chatID)
+	chat, err := findChat(r.Context(), q, chatID)
 	if err != nil {
 		slog.Error("failed to find chat", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-  _, titleGenerating := h.titleChan.Get(chatID)
+	_, titleGenerating := h.titleChan.Get(chatID)
 
 	// Render response
 	err = h.templates.Render(w, "branch-tree", branchTreeView{
-		Items:   items,
-		Chat:  ChatRender{
-      ID: chat.ID,
-      Title: chat.Title,
-    },
-		TitleGenerating:   titleGenerating,
-		BaseURI: h.baseURI,
+		Items: items,
+		Chat: ChatRender{
+			ID:    chat.ID,
+			Title: chat.Title,
+		},
+		TitleGenerating: titleGenerating,
+		BaseURI:         h.baseURI,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -229,10 +229,10 @@ func (h ChatHandler) getBranches(w http.ResponseWriter, r *http.Request) {
 }
 
 type branchTreeView struct {
-	Items   []branchTreeViewItem
-  TitleGenerating   bool
-	Chat              ChatRender
-	BaseURI string
+	Items           []branchTreeViewItem
+	TitleGenerating bool
+	Chat            ChatRender
+	BaseURI         string
 }
 
 type branchTreeViewItem struct {
