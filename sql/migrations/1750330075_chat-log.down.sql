@@ -1,1 +1,1 @@
-DROP TABLE chat_merge_log;
+DROP TABLE chat_log;
